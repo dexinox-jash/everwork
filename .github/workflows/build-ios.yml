@@ -33,8 +33,10 @@ jobs:
 
       - name: Expo Prebuild
         run: |
+          echo "Installing Expo CLI..."
+          npm install -g @expo/cli
           echo "Running expo prebuild..."
-          npx expo prebuild --platform ios --clean
+          npx expo prebuild --platform ios --clean --no-install
           echo "Prebuild complete. Listing directory:"
           ls -la
           echo "Checking ios directory:"
