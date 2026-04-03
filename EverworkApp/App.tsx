@@ -1,31 +1,33 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Button } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AppNavigator from './src/navigation/AppNavigator';
+import { useStore } from './src/store/useStore';
+
+// Initialize app
+function AppContent() {
+  const { setUser } = useStore();
+
+  useEffect(() => {
+    // Check for existing user session here
+    // For now, set a demo user
+    setUser({
+      uid: 'demo-user-1',
+      email: 'demo@everwork.app',
+      displayName: 'Demo User',
+      photoURL: null,
+    });
+  }, []);
+
+  return <AppNavigator />;
+}
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Everwork</Text>
-      <Text style={styles.subtitle}>Your productivity companion</Text>
+    <SafeAreaProvider>
       <StatusBar style="auto" />
-    </View>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-});
