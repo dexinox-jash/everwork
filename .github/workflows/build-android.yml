@@ -37,10 +37,8 @@ jobs:
 
       - name: Expo Prebuild
         run: |
-          echo "Installing Expo CLI..."
-          npm install -g @expo/cli
-          echo "Running expo prebuild..."
-          npx expo prebuild --platform android --clean --no-install
+          echo "Running expo prebuild using local CLI..."
+          ./node_modules/.bin/expo prebuild --platform android --clean
           echo "Prebuild complete. Listing directory:"
           ls -la
           echo "Checking android directory:"
