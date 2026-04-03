@@ -1,0 +1,54 @@
+name: EAS Build iOS
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: EverworkApp/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd EverworkApp
+          npm install
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install CocoaPods
+        run: sudo gem install cocoapods
+
+      - name: Configure EAS Build (Local Build)
+        run: |
+          cd EverworkApp
+          # Create a local build without needing Expo account
+          eas build --platform ios --profile preview --local --non-interactive --output build.ipa || \
+          (echo "Local build failed, attempting with npx" && \
+           npx eas-cli build --platform ios --profile preview --local --non-interactive --output build.ipa)
+        timeout-minutes: 45
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: everwork-ios
+          path: EverworkApp/build.ipa
+          retention-days: 30
