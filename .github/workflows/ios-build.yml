@@ -24,11 +24,15 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Install CocoaPods
+    - name: Setup CocoaPods
+      uses: maxim-lobanov/setup-cocoapods@v1
+      with:
+        version: latest
+
+    - name: Install Pods
       run: |
-        sudo gem install cocoapods
         cd ios
-        pod install
+        pod install --repo-update
 
     - name: Cache Pods
       uses: actions/cache@v4
