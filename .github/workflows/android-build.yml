@@ -42,6 +42,18 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
+    - name: Generate codegen files
+      run: |
+        cd android
+        ./gradlew generateCodegenArtifactsFromSchema --no-daemon || true
+        cd ..
+
+    - name: Clean build
+      run: |
+        cd android
+        ./gradlew clean --no-daemon
+        cd ..
+
     - name: Build Android APK
       run: |
         cd android
