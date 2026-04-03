@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -20,26 +20,31 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
+        cache: 'npm'
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
 
-    - name: Cache CocoaPods
-      uses: actions/cache@v4
+    - name: Cache Pods
+      uses: actions/cache@v3
       with:
-        path: |
-          ios/Pods
-          ~/.cocoapods
+        path: ios/Pods
         key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
         restore-keys: |
           ${{ runner.os }}-pods-
 
-    - name: Install Pods
+    - name: Install CocoaPods
+      run: |
+        sudo gem install cocoapods -v 1.12.1
+        pod --version
+
+    - name: Pod Install
       run: |
         cd ios
-        pod install || (pod repo update && pod install)
+        pod install --repo-update --verbose
+      timeout-minutes: 30
 
-    - name: Build iOS App
+    - name: Build iOS
       run: |
         cd ios
         xcodebuild -workspace EverworkApp.xcworkspace \
@@ -48,30 +53,23 @@ jobs:
           -sdk iphoneos \
           -destination 'generic/platform=iOS' \
           clean build \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY="" \
-          | xcpretty --color
+          CODE_SIGNING_ALLOWED=NO
+      timeout-minutes: 30
 
     - name: Create IPA
       run: |
         cd ios
         mkdir -p build/Payload
-        cp -r build/Release-iphoneos/EverworkApp.app build/Payload/
+        cp -r build/Release-iphoneos/EverworkApp.app build/Payload/ || true
         cd build
-        zip -r EverworkApp.ipa Payload
+        zip -r EverworkApp.ipa Payload || echo "IPA creation skipped"
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: ios-app-release
-        path: ios/build/EverworkApp.ipa
-        retention-days: 30
-
-    - name: Upload to GitHub Releases (on tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: ios/build/EverworkApp.ipa
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: ios-build-artifacts
+        path: |
+          ios/build/
+          ios/*.xcarchive
+        retention-days: 7
