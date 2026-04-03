@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0F0F13">
+  <title>Your Jobs | Ever Work</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Unregister old service worker if causing issues -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('[SW] Unregistered old service worker');
+        }
+        if ('caches' in window) {
+          caches.keys().then(function(cacheNames) {
+            cacheNames.forEach(function(cacheName) {
+              caches.delete(cacheName);
+            });
+          });
+        }
+      });
+    }
+  </script>
+  
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #0F0F13;
+      color: #FFFFFF;
+      min-height: 100vh;
+      padding-bottom: calc(100px + env(safe-area-inset-bottom));
+      overflow-x: hidden;
+    }
+    
+    .font-mono {
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    }
+    
+    /* Mobile-first responsive */
+    @media (max-width: 640px) {
+      html { font-size: 14px; }
+    }
+    
+    /* Job Card Styles */
+    .job-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px 20px;
+      transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    
+    .job-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      transform: translateY(-2px);
+    }
+    
+    .job-card.swiping {
+      transition: none;
+    }
+    
+    /* Swipe Archive Background */
+    .swipe-background {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 100px;
+      background: rgba(248, 113, 113, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateX(100%);
+      transition: transform 200ms ease;
+    }
+    
+    .job-card.swiped .swipe-background {
+      transform: translateX(0);
+    }
+    
+    /* Bottom Sheet */
+    .bottom-sheet-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 299;
+    }
+    
+    .bottom-sheet-overlay.open {
+      opacity: 1;
+    }
+    
+    .bottom-sheet {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 480px;
+      margin: 0 auto;
+      background: #1A1A1F;
+      border-radius: 24px 24px 0 0;
+      padding: 24px;
+      transform: translateY(100%);
+      transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 300;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
+    
+    /* Ensure hidden class works properly */
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Color Picker */
+    .color-option {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 200ms ease;
+      position: relative;
+    }
+    
+    .color-option:hover {
+      transform: scale(1.05);
+    }
+    
+    .color-option.selected {
+      box-shadow: 0 0 0 3px white;
+      transform: scale(1.05);
+    }
+    
+    .color-option.selected::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    /* Icon Picker */
+    .icon-option {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 200ms ease;
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .icon-option:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .icon-option.selected {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 0 2px rgba(255, 154, 86, 0.5);
+    }
+    
+    /* Input Styles */
+    .input-field {
+      width: 100%;
+      padding: 16px 20px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 16px;
+      transition: all 200ms ease;
+    }
+    
+    .input-field:focus {
+      outline: none;
+      border-color: rgba(255, 154, 86, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+    }
+    
+    .input-field::placeholder {
+      color: rgba(255, 255, 255, 0.35);
+    }
+    
+    /* Archive Modal */
+    .archive-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    
+    .archive-modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    
+    .archive-modal-content {
+      position: relative;
+      background: #1A1A1F;
+      border-radius: 24px 24px 0 0;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      transform: translateY(100%);
+      transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .archive-modal.open .archive-modal-content {
+      transform: translateY(0);
+    }
+    
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      padding: 12px 24px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 500;
+      opacity: 0;
+      transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    
+    .toast-success {
+      background: rgba(74, 222, 128, 0.95);
+      color: #000;
+    }
+    
+    .toast-warning {
+      background: rgba(251, 191, 36, 0.95);
+      color: #000;
+    }
+    
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes slideOut {
+      from {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(-100%);
+      }
+    }
+    
+    .animate-fade-in-up {
+      animation: fadeInUp 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    
+    .animate-slide-out {
+      animation: slideOut 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    
+    /* Stagger animation delays */
+    .stagger-1 { animation-delay: 50ms; }
+    .stagger-2 { animation-delay: 100ms; }
+    .stagger-3 { animation-delay: 150ms; }
+    .stagger-4 { animation-delay: 200ms; }
+    .stagger-5 { animation-delay: 250ms; }
+    .stagger-6 { animation-delay: 300ms; }
+    
+    /* Scrollbar for icon picker */
+    .icon-scroll::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    .icon-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .icon-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+    
+    /* Safe area padding */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="px-5 py-6 flex justify-between items-center sticky top-0 bg-[#0F0F13]/95 backdrop-blur-xl z-10">
+    <div class="flex items-center gap-3">
+      <a href="/pages/dashboard.html" class="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors">
+        <i data-lucide="arrow-left" class="w-5 h-5 text-white/70"></i>
+      </a>
+      <h1 class="text-xl font-semibold">Your Jobs</h1>
+    </div>
+    <button onclick="showAddJobSheet()" class="p-2.5 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] hover:opacity-90 transition-opacity shadow-lg shadow-[#FF6B6B]/20">
+      <i data-lucide="plus" class="w-5 h-5 text-white"></i>
+    </button>
+  </header>
+
+  <main class="px-5">
+    <!-- Jobs List -->
+    <div id="jobsList" class="space-y-3">
+      <!-- Job cards injected here -->
+    </div>
+    
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-16 opacity-0">
+      <div class="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-white/5 to-white/10 flex items-center justify-center">
+        <i data-lucide="briefcase" class="w-12 h-12 text-white/30"></i>
+      </div>
+      <h2 class="text-xl font-semibold mb-2">No jobs yet</h2>
+      <p class="text-white/50 mb-8 max-w-[240px] mx-auto">Add your first job to start tracking your time and earnings</p>
+      <button onclick="showAddJobSheet()" class="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-medium hover:opacity-90 transition-opacity shadow-lg shadow-[#FF6B6B]/20">
+        Add Your First Job
+      </button>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-[#1A1A1F]/95 backdrop-blur-xl border-t border-white/10 px-6 py-3 pb-safe z-20">
+    <div class="flex justify-around items-center max-w-md mx-auto">
+      <a href="/pages/dashboard.html" class="nav-item flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors py-2">
+        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Home</span>
+      </a>
+      <a href="/pages/timer.html" class="nav-item flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors py-2">
+        <i data-lucide="clock" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Timer</span>
+      </a>
+      <a href="/pages/jobs.html" class="nav-item flex flex-col items-center gap-1 text-[#FF9A56] py-2">
+        <i data-lucide="briefcase" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Jobs</span>
+      </a>
+      <a href="/pages/calendar.html" class="nav-item flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors py-2">
+        <i data-lucide="calendar" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Stats</span>
+      </a>
+      <a href="/pages/settings.html" class="nav-item flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors py-2">
+        <i data-lucide="settings" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Settings</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Add/Edit Job Bottom Sheet -->
+  <div id="jobSheet" class="hidden" style="position: fixed; inset: 0; z-index: 400;">
+    <div class="bottom-sheet-overlay" onclick="closeJobSheet()"></div>
+    <div class="bottom-sheet" id="jobSheetContent">
+      <!-- Handle Bar -->
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+      
+      <h3 id="sheetTitle" class="text-xl font-semibold mb-6">Add New Job</h3>
+      
+      <form id="jobForm" class="space-y-6">
+        <input type="hidden" id="jobId">
+        
+        <!-- Job Name -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Job Name</label>
+          <input type="text" id="jobName" maxlength="30" required
+                 class="input-field"
+                 placeholder="e.g., Coffee Shop">
+          <div class="text-right text-white/40 text-xs mt-1.5">
+            <span id="nameCharCount">0</span>/30
+          </div>
+        </div>
+        
+        <!-- Color Selection -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-3">Color</label>
+          <div class="grid grid-cols-4 gap-3" id="colorGrid">
+            <!-- Color options injected here -->
+          </div>
+          <input type="hidden" id="selectedColor" value="linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)">
+        </div>
+        
+        <!-- Hourly Rate (Optional) -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">
+            Hourly Rate <span class="text-white/40 font-normal">(optional)</span>
+          </label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 font-medium">$</span>
+            <input type="number" id="jobRate" min="0" step="0.01"
+                   class="input-field pl-10"
+                   placeholder="0.00">
+          </div>
+        </div>
+        
+        <!-- Icon Selection -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-3">Icon</label>
+          <div class="flex gap-2 overflow-x-auto pb-2 icon-scroll" id="iconGrid">
+            <!-- Icon options injected here -->
+          </div>
+          <input type="hidden" id="selectedIcon" value="briefcase">
+        </div>
+        
+        <!-- Submit Button -->
+        <button type="submit" 
+                class="w-full py-4 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-[#FF6B6B]/20">
+          Save Job
+        </button>
+        
+        <!-- Archive Button (Edit Mode Only) -->
+        <button type="button" id="archiveBtn" onclick="showArchiveModalFromSheet()" 
+                class="hidden w-full py-4 rounded-xl bg-[#F87171]/20 text-[#F87171] font-medium hover:bg-[#F87171]/30 transition-colors">
+          Archive Job
+        </button>
+      </form>
+      
+      <button onclick="closeJobSheet()" 
+              class="w-full mt-4 py-4 rounded-xl bg-white/10 text-white/70 font-medium hover:bg-white/15 transition-colors">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- Archive Confirmation Modal -->
+  <div id="archiveModal" class="archive-modal hidden">
+    <div class="archive-modal-overlay" onclick="closeArchiveModal()"></div>
+    <div class="archive-modal-content">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+      
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F87171]/20 flex items-center justify-center">
+        <i data-lucide="archive" class="w-8 h-8 text-[#F87171]"></i>
+      </div>
+      
+      <h3 class="text-xl font-semibold text-center mb-2">Archive Job?</h3>
+      <p class="text-white/60 text-center mb-6 text-sm">
+        This job will be archived. Your session history will be preserved and can be restored later.
+      </p>
+      
+      <div class="flex gap-3">
+        <button onclick="closeArchiveModal()" 
+                class="flex-1 py-4 rounded-xl bg-white/10 text-white/70 font-medium hover:bg-white/15 transition-colors">
+          Cancel
+        </button>
+        <button onclick="confirmArchive()" 
+                class="flex-1 py-4 rounded-xl bg-[#F87171] text-white font-medium hover:bg-[#F87171]/90 transition-colors">
+          Archive
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="archive-modal hidden">
+    <div class="archive-modal-overlay" onclick="closeDeleteModal()"></div>
+    <div class="archive-modal-content">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+      
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+        <i data-lucide="trash-2" class="w-8 h-8 text-red-500"></i>
+      </div>
+      
+      <h3 class="text-xl font-semibold text-center mb-2">Delete Job?</h3>
+      <p class="text-white/60 text-center mb-2 text-sm">
+        This will permanently delete <strong id="deleteJobName" class="text-white"></strong> and all its session history.
+      </p>
+      <p class="text-red-400 text-center mb-6 text-xs">
+        This action cannot be undone.
+      </p>
+      
+      <div class="flex gap-3">
+        <button onclick="closeDeleteModal()" 
+                class="flex-1 py-4 rounded-xl bg-white/10 text-white/70 font-medium hover:bg-white/15 transition-colors">
+          Cancel
+        </button>
+        <button onclick="confirmDelete()" 
+                class="flex-1 py-4 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="../shared/animations.css">
+  
+  <!-- Shared Scripts -->
+  <script src="../shared/config.js"></script>
+  <script src="../shared/time-service.js"></script>
+  <script src="../shared/firebase-service.js"></script>
+  <script src="../shared/scripts.js"></script>
+  <script src="../shared/enhanced-interactions.js"></script>
+  
+  <script>
+    // Wrap everything in try-catch to catch initialization errors
+    try {
+    
+    // Initialize Lucide icons
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+    
+    // ==================== State ====================
+    let jobs = [];
+    let archiveJobId = null;
+    let deleteJobId = null;
+    
+    // ==================== DB Compatibility (Dexie-style API) ====================
+    const db = {
+      jobs: {
+        get: async (id) => {
+          const allJobs = await dbService.getJobs();
+          return allJobs.find(j => j.id == id);
+        },
+        add: async (data) => {
+          const result = await dbService.createJob(data);
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to create job');
+          }
+          return result.job;
+        },
+        update: async (id, data) => {
+          const result = await dbService.updateJob(id, data);
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to update job');
+          }
+          return result;
+        }
+      },
+      sessions: {
+        where: (field) => ({
+          equals: (value) => ({
+            toArray: async () => {
+              // Use Firebase service with filters
+              if (field === 'date') {
+                const sessions = await dbService.getSessions({ date: value });
+                return sessions;
+              }
+              const allSessions = await dbService.getSessions();
+              return allSessions.filter(s => s[field] === value);
+            }
+          })
+        }),
+        add: async (data) => {
+          const result = await dbService.createSession(data);
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to create session');
+          }
+          return result.session;
+        }
+      }
+    };
+    
+    // ==================== Color Options ====================
+    const colorOptions = [
+      { name: 'Sunset', value: 'linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)' },
+      { name: 'Ocean', value: 'linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)' },
+      { name: 'Forest', value: 'linear-gradient(135deg, #43E97B 0%, #38F9D7 100%)' },
+      { name: 'Berry', value: 'linear-gradient(135deg, #FA709A 0%, #FEE140 100%)' },
+      { name: 'Midnight', value: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)' },
+      { name: 'Citrus', value: 'linear-gradient(135deg, #F093FB 0%, #F5576C 100%)' },
+      { name: 'Sky', value: 'linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)' },
+      { name: 'Fire', value: 'linear-gradient(135deg, #FF5858 0%, #F09819 100%)' }
+    ];
+    
+    // ==================== Icon Options ====================
+    const iconOptions = [
+      'briefcase', 'code', 'palette', 'pen-tool', 'camera', 'music', 
+      'book-open', 'coffee', 'truck', 'wrench', 'heart', 'star', 
+      'zap', 'globe', 'dollar-sign', 'shopping-bag', 'utensils', 
+      'laptop', 'phone', 'mail'
+    ];
+    
+    // ==================== Load Jobs ====================
+    async function loadJobs() {
+      try {
+        console.log('[Jobs] Starting loadJobs...');
+        
+        // Wait for auth to be ready (with longer timeout)
+        const user = await dbService.waitForAuth(15000);
+        console.log('[Jobs] Auth resolved:', user?.email || 'no user', 'Guest mode:', localStorage.getItem('everwork_guest_mode'));
+        
+        // Check authentication - only redirect if explicitly not logged in and not in guest mode
+        if (user === null && !localStorage.getItem('everwork_guest_mode')) {
+          console.log('[Jobs] No user logged in, redirecting to auth');
+          window.location.href = '/pages/auth.html';
+          return;
+        }
+        
+        console.log('[Jobs] Fetching jobs from dbService...');
+        jobs = await dbService.getJobs();
+        console.log('[Jobs] Jobs loaded:', jobs?.length || 0, jobs);
+        
+        const list = document.getElementById('jobsList');
+        const emptyState = document.getElementById('emptyState');
+        
+        if (!jobs || jobs.length === 0) {
+          console.log('[Jobs] No jobs found, showing empty state');
+          list.innerHTML = '';
+          emptyState.classList.remove('hidden');
+          // Trigger fade in animation
+          requestAnimationFrame(() => {
+            emptyState.style.opacity = '1';
+            emptyState.style.transition = 'opacity 400ms ease';
+          });
+          return;
+        }
+        
+        emptyState.classList.add('hidden');
+        
+        // Get today's sessions for all jobs
+        const today = getTodayISO();
+        console.log('[Jobs] Fetching sessions for today:', today);
+        let sessions = [];
+        try {
+          sessions = await db.sessions.where('date').equals(today).toArray();
+        } catch (sessionError) {
+          console.warn('[Jobs] Error loading sessions:', sessionError);
+        }
+        console.log('[Jobs] Sessions loaded:', sessions.length);
+        
+        // Render job cards with stagger animation
+        list.innerHTML = jobs.map((job, index) => {
+          const jobSessions = sessions.filter(s => s.jobId === job.id);
+          const todaySeconds = jobSessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+          const todayHours = (todaySeconds / 3600).toFixed(1);
+          const totalHours = job.totalHoursAccumulated ? job.totalHoursAccumulated.toFixed(1) : '0.0';
+          
+          return `
+            <div class="job-card opacity-0 animate-fade-in-up stagger-${Math.min(index + 1, 6)}" 
+                 data-job-id="${job.id}"
+                 onclick="handleCardClick(event, '${job.id}')">
+              <div class="flex items-center gap-4">
+                <!-- Job Icon -->
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
+                     style="background: ${job.color}">
+                  <i data-lucide="${job.icon}" class="w-6 h-6 text-white"></i>
+                </div>
+                
+                <!-- Job Info -->
+                <div class="flex-1 min-w-0">
+                  <h3 class="font-semibold text-lg truncate">${escapeHtml(job.name)}</h3>
+                  <div class="flex items-center gap-3 mt-0.5">
+                    <span class="text-white/50 text-sm">${todayHours}h today</span>
+                    ${job.hourlyRate ? `<span class="text-[#4ADE80] text-sm font-medium">$${job.hourlyRate}/hr</span>` : ''}
+                  </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex items-center gap-1">
+                  <button onclick="event.stopPropagation(); editJob('${job.id}')" 
+                          class="p-2.5 rounded-xl hover:bg-white/10 transition-colors"
+                          aria-label="Edit job">
+                    <i data-lucide="pencil" class="w-5 h-5 text-white/50"></i>
+                  </button>
+                  <button onclick="event.stopPropagation(); deleteJob('${job.id}')" 
+                          class="p-2.5 rounded-xl hover:bg-white/10 transition-colors"
+                          aria-label="Delete job">
+                    <i data-lucide="trash-2" class="w-5 h-5 text-[#F87171]"></i>
+                  </button>
+                  <button onclick="event.stopPropagation(); startJob('${job.id}')" 
+                          class="p-2.5 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] hover:opacity-90 transition-opacity shadow-lg shadow-[#FF6B6B]/20"
+                          aria-label="Start timer">
+                    <i data-lucide="play" class="w-5 h-5 text-white fill-white"></i>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Swipe Hint & Total Hours -->
+              <div class="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+                <span class="text-white/30 text-xs flex items-center gap-1">
+                  <i data-lucide="archive" class="w-3 h-3"></i>
+                  Swipe left to archive
+                </span>
+                <span class="text-white/40 text-xs">${totalHours}h total</span>
+              </div>
+              
+              <!-- Swipe Archive Background -->
+              <div class="swipe-background" onclick="event.stopPropagation(); showArchiveModal('${job.id}')">
+                <div class="flex flex-col items-center text-[#F87171]">
+                  <i data-lucide="archive" class="w-6 h-6 mb-1"></i>
+                  <span class="text-xs font-medium">Archive</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        lucide.createIcons();
+        setupSwipeToArchive();
+        
+      } catch (error) {
+        console.error('Error loading jobs:', error);
+        showToast('Failed to load jobs', 'error');
+      }
+    }
+    
+    // ==================== Swipe to Archive ====================
+    function setupSwipeToArchive() {
+      const cards = document.querySelectorAll('.job-card');
+      
+      cards.forEach(card => {
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+        
+        card.addEventListener('touchstart', (e) => {
+          startX = e.touches[0].clientX;
+          isDragging = true;
+          card.classList.add('swiping');
+        }, { passive: true });
+        
+        card.addEventListener('touchmove', (e) => {
+          if (!isDragging) return;
+          currentX = e.touches[0].clientX - startX;
+          
+          // Only allow left swipe
+          if (currentX < 0) {
+            const translateX = Math.max(currentX, -100);
+            card.style.transform = `translateX(${translateX}px)`;
+            
+            // Show archive background when swiped far enough
+            if (Math.abs(currentX) > 60) {
+              card.classList.add('swiped');
+            } else {
+              card.classList.remove('swiped');
+            }
+          }
+        }, { passive: true });
+        
+        card.addEventListener('touchend', () => {
+          isDragging = false;
+          card.classList.remove('swiping');
+          
+          if (currentX < -80) {
+            // Swiped far enough - show archive modal
+            const jobId = parseInt(card.dataset.jobId);
+            showArchiveModal(jobId);
+          }
+          
+          // Reset position
+          card.style.transform = 'translateX(0)';
+          card.classList.remove('swiped');
+          currentX = 0;
+        });
+        
+        // Mouse support for desktop
+        card.addEventListener('mousedown', (e) => {
+          startX = e.clientX;
+          isDragging = true;
+          card.classList.add('swiping');
+        });
+        
+        card.addEventListener('mousemove', (e) => {
+          if (!isDragging) return;
+          currentX = e.clientX - startX;
+          
+          if (currentX < 0) {
+            const translateX = Math.max(currentX, -100);
+            card.style.transform = `translateX(${translateX}px)`;
+            
+            if (Math.abs(currentX) > 60) {
+              card.classList.add('swiped');
+            } else {
+              card.classList.remove('swiped');
+            }
+          }
+        });
+        
+        card.addEventListener('mouseup', () => {
+          if (!isDragging) return;
+          isDragging = false;
+          card.classList.remove('swiping');
+          
+          if (currentX < -80) {
+            const jobId = parseInt(card.dataset.jobId);
+            showArchiveModal(jobId);
+          }
+          
+          card.style.transform = 'translateX(0)';
+          card.classList.remove('swiped');
+          currentX = 0;
+        });
+        
+        card.addEventListener('mouseleave', () => {
+          if (isDragging) {
+            isDragging = false;
+            card.classList.remove('swiping');
+            card.style.transform = 'translateX(0)';
+            card.classList.remove('swiped');
+            currentX = 0;
+          }
+        });
+      });
+    }
+    
+    // ==================== Card Click Handler ====================
+    function handleCardClick(event, jobId) {
+      // Don't trigger if clicking on buttons
+      if (event.target.closest('button')) return;
+      
+      // Edit job on card tap
+      editJob(jobId);
+    }
+    
+    // ==================== Show Add Job Sheet ====================
+    function showAddJobSheet() {
+      console.log('[Jobs] showAddJobSheet called');
+      try {
+        document.getElementById('sheetTitle').textContent = 'Add New Job';
+        document.getElementById('jobForm').reset();
+        document.getElementById('jobId').value = '';
+        document.getElementById('nameCharCount').textContent = '0';
+        document.getElementById('archiveBtn').classList.add('hidden');
+        
+        // Set defaults
+        document.getElementById('selectedColor').value = colorOptions[0].value;
+        document.getElementById('selectedIcon').value = 'briefcase';
+        
+        renderColorGrid();
+        renderIconGrid();
+        
+        const sheet = document.getElementById('jobSheet');
+        const overlay = sheet.querySelector('.bottom-sheet-overlay');
+        const content = document.getElementById('jobSheetContent');
+        
+        sheet.classList.remove('hidden');
+        
+        requestAnimationFrame(() => {
+          overlay.classList.add('open');
+          content.classList.add('open');
+        });
+        
+        // Focus on name input
+        setTimeout(() => document.getElementById('jobName').focus(), 100);
+      } catch (error) {
+        console.error('[Jobs] Error opening Add Job sheet:', error);
+        alert('Error opening form: ' + error.message);
+      }
+    }
+    
+    // Immediately expose to window so it's available for onclick handlers
+    window.showAddJobSheet = showAddJobSheet;
+    
+    // ==================== Edit Job ====================
+    async function editJob(jobId) {
+      try {
+        const job = await db.jobs.get(jobId);
+        if (!job) {
+          showToast('Job not found', 'error');
+          return;
+        }
+        
+        document.getElementById('sheetTitle').textContent = 'Edit Job';
+        document.getElementById('jobId').value = job.id;
+        document.getElementById('jobName').value = job.name;
+        document.getElementById('nameCharCount').textContent = job.name.length;
+        document.getElementById('jobRate').value = job.hourlyRate || '';
+        document.getElementById('selectedColor').value = job.color;
+        document.getElementById('selectedIcon').value = job.icon;
+        document.getElementById('archiveBtn').classList.remove('hidden');
+        
+        renderColorGrid(job.color);
+        renderIconGrid(job.icon);
+        
+        const sheet = document.getElementById('jobSheet');
+        const overlay = sheet.querySelector('.bottom-sheet-overlay');
+        const content = document.getElementById('jobSheetContent');
+        
+        sheet.classList.remove('hidden');
+        
+        requestAnimationFrame(() => {
+          overlay.classList.add('open');
+          content.classList.add('open');
+        });
+        
+      } catch (error) {
+        console.error('Error loading job:', error);
+        showToast('Failed to load job', 'error');
+      }
+    }
+    
+    // ==================== Close Job Sheet ====================
+    function closeJobSheet() {
+      try {
+        const sheet = document.getElementById('jobSheet');
+        const overlay = sheet.querySelector('.bottom-sheet-overlay');
+        const content = document.getElementById('jobSheetContent');
+        
+        overlay.classList.remove('open');
+        content.classList.remove('open');
+        
+        setTimeout(() => {
+          sheet.classList.add('hidden');
+        }, 300);
+      } catch (error) {
+        console.error('[Jobs] Error closing job sheet:', error);
+      }
+    }
+    
+    // ==================== Render Color Grid ====================
+    function renderColorGrid(selectedColor = colorOptions[0].value) {
+      const grid = document.getElementById('colorGrid');
+      grid.innerHTML = colorOptions.map(color => `
+        <button type="button" 
+                onclick="selectColor('${color.value}')"
+                class="color-option ${color.value === selectedColor ? 'selected' : ''}"
+                style="background: ${color.value}"
+                data-color="${color.value}"
+                aria-label="Select ${color.name} color">
+        </button>
+      `).join('');
+    }
+    
+    // ==================== Select Color ====================
+    function selectColor(color) {
+      document.getElementById('selectedColor').value = color;
+      
+      document.querySelectorAll('#colorGrid .color-option').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.color === color);
+      });
+    }
+    
+    // ==================== Render Icon Grid ====================
+    function renderIconGrid(selectedIcon = 'briefcase') {
+      const grid = document.getElementById('iconGrid');
+      grid.innerHTML = iconOptions.map(icon => `
+        <button type="button" 
+                onclick="selectIcon('${icon}')"
+                class="icon-option ${icon === selectedIcon ? 'selected' : ''}"
+                data-icon="${icon}"
+                aria-label="Select ${icon} icon">
+          <i data-lucide="${icon}" class="w-5 h-5 text-white"></i>
+        </button>
+      `).join('');
+      
+      lucide.createIcons();
+    }
+    
+    // ==================== Select Icon ====================
+    function selectIcon(icon) {
+      document.getElementById('selectedIcon').value = icon;
+      renderIconGrid(icon);
+    }
+    
+    // ==================== Form Submit ====================
+    document.getElementById('jobForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // Check if user is authenticated
+      const currentUser = dbService.getCurrentUser();
+      if (!currentUser && !localStorage.getItem('everwork_guest_mode')) {
+        showToast('Please log in to save jobs', 'error');
+        setTimeout(() => {
+          window.location.href = '/pages/auth.html';
+        }, 2000);
+        return;
+      }
+      
+      const jobId = document.getElementById('jobId').value;
+      const name = document.getElementById('jobName').value.trim();
+      
+      if (!name) {
+        showToast('Please enter a job name', 'warning');
+        return;
+      }
+      
+      // Use accurate time for timestamps
+      const accurateNow = typeof timeService !== 'undefined' ? timeService.toISOString() : new Date().toISOString();
+      
+      const jobData = {
+        name: name,
+        hourlyRate: parseFloat(document.getElementById('jobRate').value) || null,
+        color: document.getElementById('selectedColor').value,
+        icon: document.getElementById('selectedIcon').value,
+        updatedAt: accurateNow
+      };
+      
+      try {
+        if (jobId) {
+          // Edit existing
+          const existing = await db.jobs.get(parseInt(jobId));
+          if (!existing) {
+            showToast('Job not found', 'error');
+            return;
+          }
+          jobData.createdAt = existing.createdAt;
+          jobData.totalHoursAccumulated = existing.totalHoursAccumulated || 0;
+          jobData.archived = existing.archived || 0;
+          
+          await db.jobs.update(jobId, jobData);
+          showToast('Job updated!', 'success');
+        } else {
+          // Add new
+          await db.jobs.add(jobData);
+          showToast('Job added!', 'success');
+        }
+        
+        closeJobSheet();
+        await loadJobs();
+        
+      } catch (error) {
+        console.error('Error saving job:', error);
+        showToast('Failed to save job: ' + error.message, 'error');
+      }
+    });
+    
+    // ==================== Character Count ====================
+    document.getElementById('jobName').addEventListener('input', (e) => {
+      document.getElementById('nameCharCount').textContent = e.target.value.length;
+    });
+    
+    // ==================== Start Job Timer ====================
+    function startJob(jobId) {
+      // Check if timer already running
+      if (hasActiveTimer()) {
+        showToast('Stop current timer first', 'warning');
+        window.location.href = '/pages/timer.html';
+        return;
+      }
+      
+      const session = {
+        id: generateUUID(),
+        jobId: jobId,
+        startTime: new Date().toISOString(),
+        endTime: null,
+        duration: 0,
+        date: getTodayISO(),
+        note: '',
+        earnings: 0
+      };
+      
+      setActiveTimer(session);
+      window.location.href = '/pages/timer.html';
+    }
+    
+    // ==================== Archive Modal ====================
+    function showArchiveModal(jobId) {
+      archiveJobId = jobId;
+      const modal = document.getElementById('archiveModal');
+      modal.classList.remove('hidden');
+      
+      requestAnimationFrame(() => {
+        modal.classList.add('open');
+      });
+    }
+    
+    function showArchiveModalFromSheet() {
+      const jobId = document.getElementById('jobId').value;
+      if (jobId) {
+        closeJobSheet();
+        setTimeout(() => showArchiveModal(parseInt(jobId)), 300);
+      }
+    }
+    
+    function closeArchiveModal() {
+      const modal = document.getElementById('archiveModal');
+      modal.classList.remove('open');
+      
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        archiveJobId = null;
+      }, 300);
+    }
+    
+    async function confirmArchive() {
+      if (!archiveJobId) return;
+      
+      try {
+        await db.jobs.update(archiveJobId, { archived: 1 });
+        
+        // Animate card removal
+        const card = document.querySelector(`[data-job-id="${archiveJobId}"]`);
+        if (card) {
+          card.classList.add('animate-slide-out');
+          setTimeout(() => {
+            closeArchiveModal();
+            loadJobs();
+          }, 400);
+        } else {
+          closeArchiveModal();
+          loadJobs();
+        }
+        
+        showToast('Job archived', 'success');
+        
+      } catch (error) {
+        console.error('Error archiving job:', error);
+        showToast('Failed to archive job', 'error');
+        closeArchiveModal();
+      }
+    }
+    
+    // ==================== Delete Functions ====================
+    function deleteJob(jobId) {
+      const job = jobs.find(j => j.id == jobId);
+      if (!job) {
+        showToast('Job not found', 'error');
+        return;
+      }
+      
+      deleteJobId = jobId;
+      document.getElementById('deleteJobName').textContent = job.name;
+      const modal = document.getElementById('deleteModal');
+      modal.classList.remove('hidden');
+      
+      requestAnimationFrame(() => {
+        modal.classList.add('open');
+      });
+    }
+    
+    function closeDeleteModal() {
+      const modal = document.getElementById('deleteModal');
+      modal.classList.remove('open');
+      
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        deleteJobId = null;
+      }, 300);
+    }
+    
+    async function confirmDelete() {
+      if (!deleteJobId) return;
+      
+      try {
+        showToast('Deleting job...', 'info');
+        
+        const result = await dbService.deleteJob(deleteJobId);
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to delete job');
+        }
+        
+        // Animate card removal
+        const card = document.querySelector(`[data-job-id="${deleteJobId}"]`);
+        if (card) {
+          card.classList.add('animate-slide-out');
+          setTimeout(() => {
+            closeDeleteModal();
+            loadJobs();
+          }, 400);
+        } else {
+          closeDeleteModal();
+          loadJobs();
+        }
+        
+        showToast('Job deleted', 'success');
+        
+      } catch (error) {
+        console.error('Error deleting job:', error);
+        showToast('Failed to delete job: ' + error.message, 'error');
+        closeDeleteModal();
+      }
+    }
+    
+    // ==================== Utility Functions ====================
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function getTodayISO() {
+      // Use accurate time service if available
+      if (typeof timeService !== 'undefined' && timeService.timeInitialized) {
+        return timeService.getTodayDate();
+      }
+      return new Date().toISOString().split('T')[0];
+    }
+    
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+    }
+    
+    function hasActiveTimer() {
+      return localStorage.getItem('activeTimer') !== null;
+    }
+    
+    function setActiveTimer(session) {
+      localStorage.setItem('activeTimer', JSON.stringify(session));
+    }
+    
+    function showToast(message, type = 'info') {
+      // Remove existing toast
+      const existingToast = document.querySelector('.toast');
+      if (existingToast) {
+        existingToast.remove();
+      }
+      
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      requestAnimationFrame(() => {
+        toast.classList.add('show');
+      });
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    // ==================== Keyboard Shortcuts ====================
+    document.addEventListener('keydown', (e) => {
+      // Close sheet on Escape
+      if (e.key === 'Escape') {
+        const sheet = document.getElementById('jobSheet');
+        const modal = document.getElementById('archiveModal');
+        
+        if (!sheet.classList.contains('hidden')) {
+          closeJobSheet();
+        } else if (!modal.classList.contains('hidden')) {
+          closeArchiveModal();
+        }
+      }
+    });
+    
+    // ==================== Initialize ====================
+    document.addEventListener('DOMContentLoaded', () => {
+      loadJobs();
+    });
+    
+    // ==================== Expose functions to global scope for HTML onclick handlers ====================
+    window.showAddJobSheet = showAddJobSheet;
+    window.closeJobSheet = closeJobSheet;
+    window.editJob = editJob;
+    window.selectColor = selectColor;
+    window.selectIcon = selectIcon;
+    window.startJob = startJob;
+    window.showArchiveModalFromSheet = showArchiveModalFromSheet;
+    window.closeArchiveModal = closeArchiveModal;
+    window.confirmArchive = confirmArchive;
+    window.handleCardClick = handleCardClick;
+    window.deleteJob = deleteJob;
+    window.closeDeleteModal = closeDeleteModal;
+    window.confirmDelete = confirmDelete;
+    
+    } catch (err) {
+      console.error('[Jobs] Script initialization error:', err);
+      alert('Error initializing jobs page: ' + err.message);
+    }
+  </script>
+</body>
+</html>

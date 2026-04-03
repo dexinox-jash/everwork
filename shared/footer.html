@@ -1,0 +1,37 @@
+<!-- 
+  Ever Work - Footer Component
+  Simple footer for the app - typically not needed for mobile PWA
+  but included for completeness
+-->
+
+<footer class="app-footer" style="display: none;">
+  <div class="footer-content">
+    <p class="footer-text">Ever Work - Track your hustle</p>
+    <p class="footer-version">Version 1.0.0</p>
+  </div>
+</footer>
+
+<style>
+.app-footer {
+  padding: var(--space-6) var(--page-padding-x);
+  text-align: center;
+  border-top: 1px solid var(--glass-border);
+  margin-top: var(--space-8);
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.footer-text {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.footer-version {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+</style>

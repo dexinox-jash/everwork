@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==================== HELPER FUNCTIONS ====================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Validate job data structure
+    function isValidJob() {
+      return request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() < 100
+        && request.resource.data.name.matches('^[\\w\\s\\-\\.]+$')
+        && request.resource.data.hourlyRate is number
+        && request.resource.data.hourlyRate >= 0
+        && request.resource.data.hourlyRate < 10000
+        && (!request.resource.data.keys().hasAny(['color']) || request.resource.data.color is string)
+        && (!request.resource.data.keys().hasAny(['icon']) || request.resource.data.icon is string);
+    }
+    
+    // Validate session data structure
+    function isValidSession() {
+      return request.resource.data.jobId is string
+        && request.resource.data.jobId.size() > 0
+        && request.resource.data.startTime is string
+        && request.resource.data.startTime.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z?$')
+        && request.resource.data.durationSeconds is number
+        && request.resource.data.durationSeconds >= 0
+        && request.resource.data.durationSeconds < 2592000  // Max 30 days
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && (!request.resource.data.keys().hasAny(['note']) || request.resource.data.note.size() < 1000)
+        && (!request.resource.data.keys().hasAny(['earnings']) || request.resource.data.earnings is number);
+    }
+    
+    // Validate timer data structure
+    function isValidTimer() {
+      return request.resource.data.jobId is string
+        && request.resource.data.sessionId is string
+        && request.resource.data.serverStartTime is string
+        && request.resource.data.isRunning is bool
+        && request.resource.data.isRunning == true;
+    }
+    
+    // ==================== USER DOCUMENTS ====================
+    
+    match /users/{userId} {
+      // Users can only access their own data
+      allow read, write: if isOwner(userId);
+      
+      // ==================== JOBS SUBCOLLECTION ====================
+      
+      match /jobs/{jobId} {
+        allow read: if isOwner(userId);
+        
+        allow create: if isOwner(userId) 
+          && isValidJob()
+          && request.resource.data.createdAt is timestamp;
+        
+        allow update: if isOwner(userId) 
+          && isValidJob()
+          && (!request.resource.data.keys().hasAny(['createdAt']) || request.resource.data.createdAt == resource.data.createdAt);
+        
+        allow delete: if isOwner(userId);
+      }
+      
+      // ==================== SESSIONS SUBCOLLECTION ====================
+      
+      match /sessions/{sessionId} {
+        allow read: if isOwner(userId);
+        
+        allow create: if isOwner(userId) 
+          && isValidSession()
+          && request.resource.data.createdAt is timestamp;
+        
+        allow update: if isOwner(userId) 
+          && request.resource.data.isManuallyEdited == true
+          // Validate only changed fields, merge with existing data
+          && (request.resource.data.keys().hasAny(['jobId']) ? request.resource.data.jobId is string : true)
+          && (request.resource.data.keys().hasAny(['startTime']) ? request.resource.data.startTime is string : true)
+          && (request.resource.data.keys().hasAny(['durationSeconds']) ? request.resource.data.durationSeconds is number : true)
+          && (request.resource.data.keys().hasAny(['date']) ? request.resource.data.date is string : true);
+        
+        allow delete: if isOwner(userId);
+      }
+      
+      // ==================== ACTIVE TIMERS SUBCOLLECTION ====================
+      
+      match /activeTimers/{timerId} {
+        allow read: if isOwner(userId);
+        
+        allow create: if isOwner(userId) 
+          && isValidTimer()
+          && request.resource.data.createdAt is timestamp;
+        
+        allow update: if isOwner(userId);
+        
+        allow delete: if isOwner(userId);
+      }
+      
+      // ==================== PROFILE SUBCOLLECTION ====================
+      
+      match /profile/{profileId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // ==================== SETTINGS SUBCOLLECTION ====================
+      
+      match /settings/{settingId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // ==================== DENY ALL ELSE ====================
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

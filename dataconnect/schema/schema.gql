@@ -1,0 +1,22 @@
+type User @table {
+  displayName: String!
+  email: String
+  createdAt: Timestamp!
+}
+
+type Project @table {
+  user: User!
+  name: String!
+  description: String
+  createdAt: Timestamp!
+}
+
+type WorkEntry @table {
+  user: User!
+  project: Project
+  startTime: Timestamp!
+  endTime: Timestamp!
+  date: Date!
+  notes: String
+  createdAt: Timestamp!
+}

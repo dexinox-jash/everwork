@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ever Work - Time Tracker</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0F0F13;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #FF9A56, #FF6B6B);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,154,86,0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 0 20px 5px rgba(255,154,86,0.3); }
+    }
+    .loader {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,154,86,0.3);
+      border-top-color: #FF9A56;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { font-size: 32px; margin-bottom: 8px; }
+    p { color: rgba(255,255,255,0.6); margin-bottom: 30px; }
+    .btn {
+      background: linear-gradient(135deg, #FF9A56, #FF6B6B);
+      color: white;
+      padding: 16px 48px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 18px;
+      font-weight: 600;
+      display: inline-block;
+      margin-top: 20px;
+    }
+    .btn:hover { opacity: 0.9; }
+  </style>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  
+  <script>
+    // Initialize Firebase with config from config.js
+    const firebaseConfig = {
+      apiKey: "AIzaSyBzGdURq68HEri4Y5S8TX28lChc-d9nLAE",
+      authDomain: "ever-work-ee664.firebaseapp.com",
+      projectId: "ever-work-ee664",
+      storageBucket: "ever-work-ee664.firebasestorage.app",
+      messagingSenderId: "308449238576",
+      appId: "1:308449238576:web:cfc5bb106950abe40717f5"
+    };
+    firebase.initializeApp(firebaseConfig);
+    
+    // Check auth state and redirect
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user || localStorage.getItem('everwork_guest_mode')) {
+        // User is logged in or guest mode - go to dashboard
+        window.location.replace('/pages/dashboard.html');
+      } else {
+        // Not logged in - go to auth page
+        window.location.replace('/pages/auth.html');
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="logo">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <polyline points="12 6 12 12 16 14"/>
+    </svg>
+  </div>
+  <h1>Ever Work</h1>
+  <p>Track your hustle. Celebrate your grind.</p>
+  <div class="loader"></div>
+  <a href="/pages/auth.html" class="btn">Get Started</a>
+</body>
+</html>

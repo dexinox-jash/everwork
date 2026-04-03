@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0F0F13">
+  <title>Dashboard | Ever Work</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Unregister old service worker if causing issues -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('[SW] Unregistered old service worker');
+        }
+        // Clear caches
+        if ('caches' in window) {
+          caches.keys().then(function(cacheNames) {
+            cacheNames.forEach(function(cacheName) {
+              caches.delete(cacheName);
+              console.log('[SW] Deleted cache:', cacheName);
+            });
+          });
+        }
+      });
+    }
+  </script>
+  
+  <style>
+    :root {
+      --primary-start: #FF9A56;
+      --primary-end: #FF6B6B;
+      --bg-primary: #0F0F13;
+      --bg-secondary: #1A1A1F;
+      --gold: #FFD700;
+      --success: #4ADE80;
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.7);
+      --text-tertiary: rgba(255, 255, 255, 0.5);
+      --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    * { 
+      box-sizing: border-box; 
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    html, body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    /* Mobile-first responsive text */
+    @media (max-width: 640px) {
+      html { font-size: 14px; }
+    }
+    
+    /* Safe area for notched phones */
+    .safe-area-inset {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Glass Card */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+    }
+    
+    /* Job Card */
+    .job-card {
+      padding: 20px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 200ms var(--ease-default);
+      cursor: pointer;
+    }
+    
+    .job-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      transform: translateY(-2px);
+    }
+    
+    .job-card.active {
+      border-color: rgba(255, 154, 86, 0.5);
+      box-shadow: 0 0 20px rgba(255, 154, 86, 0.15);
+    }
+    
+    /* FAB Pulse */
+    @keyframes pulse-glow {
+      0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(255, 107, 107, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 12px 40px rgba(255, 107, 107, 0.5); }
+    }
+    
+    .fab-pulse { animation: pulse-glow 2s ease-in-out infinite; }
+    .fab-pulse:hover { animation: none; transform: scale(1.05); }
+    .fab-pulse:active { transform: scale(0.95); }
+    
+    /* Banner Pulse */
+    @keyframes banner-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 154, 86, 0.2); }
+      50% { box-shadow: 0 0 20px 5px rgba(255, 154, 86, 0.3); }
+    }
+    
+    .banner-pulse { animation: banner-pulse 2s ease-in-out infinite; }
+    
+    /* Progress Circle */
+    .progress-circle-fill { transition: stroke-dashoffset 800ms var(--ease-default); }
+    
+    /* Stagger Animation */
+    .stagger-item { opacity: 0; transform: translateY(20px); }
+    .stagger-item.visible { 
+      opacity: 1; 
+      transform: translateY(0); 
+      transition: opacity 300ms var(--ease-default), transform 300ms var(--ease-default);
+    }
+    
+    /* Bottom Sheet */
+    .bottom-sheet-overlay {
+      opacity: 0;
+      transition: opacity 300ms var(--ease-default);
+    }
+    .bottom-sheet-overlay.open { opacity: 1; }
+    
+    .bottom-sheet-content {
+      transform: translateY(100%);
+      transition: transform 300ms var(--ease-default);
+    }
+    .bottom-sheet-content.open { transform: translateY(0); }
+    
+    /* Timeline Edit Button */
+    .timeline-item { position: relative; }
+    .timeline-item .edit-btn {
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+    .timeline-item:hover .edit-btn { opacity: 1; }
+    
+    /* Toast */
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    .toast { animation: toast-in 300ms var(--ease-default); }
+    
+    /* Sync Status */
+    .sync-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+    .sync-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .sync-offline { background: #FBBF24; }
+    .sync-syncing { background: var(--primary-start); animation: pulse-sync 1s infinite; }
+    
+    @keyframes pulse-sync {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+    
+    /* Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+    
+    /* Ensure hidden class works */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body class="bg-[#0F0F13] text-white min-h-screen pb-28">
+  
+  <!-- Sync Status Bar -->
+  <div id="syncBar" class="fixed top-0 left-0 right-0 z-50 bg-[#1A1A1F]/95 backdrop-blur-xl border-b border-white/5 px-4 py-2 hidden">
+    <div class="flex items-center justify-center gap-2 text-sm">
+      <div id="syncIndicator" class="sync-indicator sync-online"></div>
+      <span id="syncText" class="text-white/60">Synced</span>
+    </div>
+  </div>
+  
+  <!-- Header -->
+  <header class="px-5 pt-6 pb-4 flex justify-between items-center stagger-item" id="headerSection">
+    <div>
+      <div class="flex items-center gap-2">
+        <p class="text-white/50 text-sm font-medium" id="currentDate">Loading...</p>
+        <div id="headerSyncIndicator" class="sync-indicator sync-online hidden"></div>
+      </div>
+      <h1 class="text-2xl font-bold mt-0.5">Today's Hustle</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="syncBtn" onclick="manualSync()" class="w-11 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all" title="Sync now">
+        <i data-lucide="refresh-cw" class="w-4 h-4 text-white/50"></i>
+      </button>
+      <button id="settingsBtn" onclick="window.location.href = '/pages/settings.html'" class="w-11 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all">
+        <i data-lucide="settings" class="w-4 h-4 text-white/50"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Pull to refresh indicator -->
+  <div id="pullIndicator" class="fixed top-0 left-0 right-0 z-40 flex items-center justify-center py-4 transition-transform duration-300 -translate-y-full">
+    <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-[#1A1A1F]/90 backdrop-blur-xl border border-white/10">
+      <i data-lucide="refresh-cw" class="w-4 h-4 text-white/60" id="pullIcon"></i>
+      <span class="text-sm text-white/60" id="pullText">Pull to refresh</span>
+    </div>
+  </div>
+
+  <main id="mainContent" class="px-5 space-y-6">
+    
+    <!-- Hero: Progress Circle -->
+    <section id="heroSection" class="flex flex-col items-center py-4 stagger-item">
+      <div class="relative w-52 h-52">
+        <svg class="w-full h-full" viewBox="0 0 200 200">
+          <defs>
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF9A56"/>
+              <stop offset="100%" stop-color="#FF6B6B"/>
+            </linearGradient>
+          </defs>
+          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="12"/>
+          <circle id="progressCircle" cx="100" cy="100" r="88" fill="none" 
+                  stroke="url(#progressGradient)" stroke-width="12" stroke-linecap="round"
+                  stroke-dasharray="552.9" stroke-dashoffset="552.9"
+                  class="progress-circle-fill" transform="rotate(-90 100 100)"/>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span id="totalHours" class="text-5xl font-bold font-mono tracking-tight">0.0</span>
+          <span class="text-white/50 text-sm mt-1">hours today</span>
+          <span id="goalText" class="text-white/40 text-xs mt-2">/ 8h goal</span>
+        </div>
+      </div>
+      <p id="encouragementQuote" class="mt-5 text-white/60 text-sm text-center italic max-w-[280px]">
+        Ready to crush your goals?
+      </p>
+    </section>
+
+    <!-- Active Timer Banner -->
+    <section id="activeTimerBanner" class="hidden stagger-item">
+      <div class="rounded-2xl p-4 flex items-center justify-between banner-pulse
+                  bg-[rgba(255,154,86,0.1)] border border-[rgba(255,154,86,0.2)]">
+        <div class="flex items-center gap-4 flex-1 cursor-pointer" onclick="goToTimer()">
+          <div id="activeJobColor" class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+               style="background: linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)">
+            <i id="activeJobIcon" data-lucide="briefcase" class="w-7 h-7 text-white"></i>
+          </div>
+          <div>
+            <p class="text-white/50 text-xs uppercase tracking-wide font-medium">Currently Working</p>
+            <p id="activeJobName" class="font-semibold text-lg">Coffee Shop</p>
+            <p id="activeTimerDisplay" class="text-2xl font-mono text-[#FF9A56] font-medium tracking-wider">00:00:00</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Stop Timer Button -->
+          <button onclick="event.stopPropagation(); stopTimerFromBanner()" 
+                  class="w-10 h-10 rounded-full bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
+                  title="Stop Timer">
+            <i data-lucide="square" class="w-4 h-4 text-red-400 fill-red-400"></i>
+          </button>
+          <!-- Cancel/Delete Timer Button -->
+          <button onclick="event.stopPropagation(); cancelTimerFromBanner()" 
+                  class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                  title="Cancel Timer">
+            <i data-lucide="trash-2" class="w-4 h-4 text-white/60"></i>
+          </button>
+          <div class="w-3 h-3 rounded-full bg-[#FF6B6B] animate-pulse ml-1"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Job Grid -->
+    <section class="stagger-item">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Your Jobs</h2>
+        <button onclick="window.location.href = '/pages/jobs.html'" class="text-[#FF9A56] text-sm font-medium hover:underline">
+          Manage
+        </button>
+      </div>
+      <div id="jobGrid" class="grid grid-cols-2 gap-4">
+        <!-- Skeleton loading state -->
+        <div class="skeleton p-5 rounded-2xl h-28"></div>
+        <div class="skeleton p-5 rounded-2xl h-28"></div>
+        <div class="skeleton p-5 rounded-2xl h-28"></div>
+        <div class="skeleton p-5 rounded-2xl h-28"></div>
+      </div>
+    </section>
+
+    <!-- Today's Timeline -->
+    <section class="stagger-item">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Today's Sessions</h2>
+        <button onclick="showAddManualSession()" class="text-[#FF9A56] text-sm font-medium hover:underline flex items-center gap-1">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          Add Manual
+        </button>
+      </div>
+      <div id="timelineList" class="space-y-3">
+        <!-- Skeleton loading state -->
+        <div class="skeleton p-4 rounded-xl h-16"></div>
+        <div class="skeleton p-4 rounded-xl h-16"></div>
+        <div class="skeleton p-4 rounded-xl h-16"></div>
+      </div>
+    </section>
+    
+    <div class="h-24"></div>
+  </main>
+
+  <!-- Floating Action Button -->
+  <button id="fab" onclick="showQuickStart()" 
+          class="fixed bottom-28 right-5 w-20 h-20 rounded-full fab-pulse z-40
+                 bg-gradient-to-br from-[#FF9A56] to-[#FF6B6B] 
+                 flex items-center justify-center transition-transform">
+    <i data-lucide="play" class="w-8 h-8 text-white fill-white"></i>
+  </button>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-[#1A1A1F]/95 backdrop-blur-xl border-t border-white/10 px-4 py-3 pb-safe z-50">
+    <div class="flex justify-around items-center max-w-md mx-auto">
+      <a href="/pages/dashboard.html" class="nav-item active flex flex-col items-center gap-1 text-[#FF9A56]">
+        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Home</span>
+      </a>
+      <a href="/pages/timer.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="clock" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Timer</span>
+      </a>
+      <a href="/pages/jobs.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="briefcase" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Jobs</span>
+      </a>
+      <a href="/pages/calendar.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="calendar" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Stats</span>
+      </a>
+      <a href="/pages/settings.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="settings" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Settings</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Quick Start Bottom Sheet -->
+  <div id="quickStartSheet" class="fixed inset-0 z-[100] hidden">
+    <div class="bottom-sheet-overlay absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeQuickStart()"></div>
+    <div class="bottom-sheet-content absolute bottom-0 left-0 right-0 bg-[#1A1A1F] rounded-t-3xl p-6 max-w-md mx-auto" id="quickStartContent">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+      <h3 class="text-xl font-semibold mb-5">Start Working</h3>
+      <div id="quickStartJobs" class="space-y-3 max-h-[60vh] overflow-y-auto pb-4">
+        <!-- Job options injected here -->
+      </div>
+      <button onclick="closeQuickStart()" class="w-full mt-4 py-4 rounded-xl bg-white/10 hover:bg-white/15 text-white/70 font-medium transition-colors">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- Edit Session Modal -->
+  <div id="editSessionModal" class="fixed inset-0 z-[200] hidden">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeEditSession()"></div>
+    <div class="absolute bottom-0 left-0 right-0 bg-[#1A1A1F] rounded-t-3xl p-6 max-w-md mx-auto max-h-[90vh] overflow-y-auto">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+      <h3 class="text-xl font-semibold mb-6">Edit Session</h3>
+      
+      <form id="editSessionForm" class="space-y-5">
+        <input type="hidden" id="editSessionId">
+        
+        <!-- Job Selection -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Job</label>
+          <select id="editJobId" class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+            <!-- Options injected -->
+          </select>
+        </div>
+        
+        <!-- Date -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Date</label>
+          <input type="date" id="editDate" required class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+        </div>
+        
+        <!-- Start Time -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Start Time</label>
+          <input type="datetime-local" id="editStartTime" required class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+        </div>
+        
+        <!-- End Time -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">End Time</label>
+          <input type="datetime-local" id="editEndTime" required class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+          <p class="text-white/40 text-xs mt-1">Duration: <span id="editDuration" class="text-[#FF9A56]">0h 0m</span></p>
+        </div>
+        
+        <!-- Note -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Note (optional)</label>
+          <input type="text" id="editNote" maxlength="140" placeholder="What did you work on?" 
+                 class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+          <p class="text-right text-white/40 text-xs mt-1"><span id="editNoteCount">0</span>/140</p>
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="deleteSession()" class="px-6 py-4 rounded-xl bg-[#F87171]/20 text-[#F87171] font-medium hover:bg-[#F87171]/30 transition-colors">
+            <i data-lucide="trash-2" class="w-5 h-5"></i>
+          </button>
+          <button type="button" onclick="closeEditSession()" class="flex-1 py-4 rounded-xl bg-white/10 text-white/70 font-medium hover:bg-white/15 transition-colors">
+            Cancel
+          </button>
+          <button type="submit" class="flex-1 py-4 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-semibold hover:opacity-90 transition-opacity">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Manual Session Modal -->
+  <div id="addManualSessionModal" class="fixed inset-0 z-[200] hidden">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAddManualSession()"></div>
+    <div class="absolute bottom-0 left-0 right-0 bg-[#1A1A1F] rounded-t-3xl p-6 max-w-md mx-auto max-h-[90vh] overflow-y-auto">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+      <h3 class="text-xl font-semibold mb-6">Add Session</h3>
+      
+      <form id="addManualSessionForm" class="space-y-5">
+        <!-- Job Selection -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Job *</label>
+          <select id="manualJobId" required class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+            <option value="">Select a job</option>
+            <!-- Options injected -->
+          </select>
+        </div>
+        
+        <!-- Date -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Date *</label>
+          <input type="date" id="manualDate" required class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+        </div>
+        
+        <!-- Start Time -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Start Time *</label>
+          <input type="time" id="manualStartTime" required class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+        </div>
+        
+        <!-- End Time -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">End Time *</label>
+          <input type="time" id="manualEndTime" required class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+          <p class="text-white/40 text-xs mt-1">Duration: <span id="manualDuration" class="text-[#FF9A56]">0h 0m</span></p>
+        </div>
+        
+        <!-- Note -->
+        <div>
+          <label class="block text-white/70 text-sm font-medium mb-2">Note (optional)</label>
+          <input type="text" id="manualNote" maxlength="140" placeholder="What did you work on?" 
+                 class="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#FF9A56]/50">
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeAddManualSession()" class="flex-1 py-4 rounded-xl bg-white/10 text-white/70 font-medium hover:bg-white/15 transition-colors">
+            Cancel
+          </button>
+          <button type="submit" class="flex-1 py-4 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-semibold hover:opacity-90 transition-opacity">
+            Add Session
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed top-6 left-1/2 -translate-x-1/2 z-[500] pointer-events-none"></div>
+
+  <!-- Scripts -->
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="../shared/animations.css">
+  
+  <script src="../shared/config.js"></script>
+  <script src="../shared/validation.js"></script>
+  <script src="../shared/time-service.js"></script>
+  <script src="../shared/firebase-service.js"></script>
+  <script src="../shared/scripts.js"></script>
+  <script src="../shared/enhanced-interactions.js"></script>
+  
+  <script>
+    // ============================================
+    // Dashboard Application Logic
+    // ============================================
+    
+    try {
+    
+    let currentUser = null;
+    let activeTimer = null;
+    let jobs = [];
+    let todaySessions = [];
+    let dailyGoal = 8;
+    let goalCelebrated = false;
+    let timerInterval = null;
+    
+    const encouragementQuotes = [
+      "You're crushing it!",
+      "Every minute counts!",
+      "Proud of your hustle!",
+      "Keep the momentum going!",
+      "You're doing amazing!",
+      "Small steps, big results!",
+      "Your effort matters!",
+      "Making it happen!"
+    ];
+    
+    // Initialize dashboard
+    async function init() {
+      // Check if coming from timer with new session
+      const needsRefresh = localStorage.getItem('everwork_dashboard_refresh');
+      if (needsRefresh) {
+        console.log('[Dashboard] Refresh flag detected, clearing cache');
+        localStorage.removeItem('everwork_dashboard_refresh');
+        // Clear any cached session data to force fresh load
+        sessionsCache = [];
+      }
+      
+      // Wait for Firebase auth to be ready
+      console.log('[Dashboard] Waiting for auth...');
+      const user = await dbService.waitForAuth(15000);
+      console.log('[Dashboard] Auth resolved:', user?.email || 'no user');
+      
+      // Check authentication - only redirect if explicitly not logged in and not in guest mode
+      if (user === null && !localStorage.getItem('everwork_guest_mode')) {
+        console.log('[Dashboard] No user, redirecting to auth');
+        window.location.replace('/pages/auth.html');
+        return;
+      }
+      
+      currentUser = user;
+      
+      // Show sync indicator for logged-in users
+      if (user) {
+        document.getElementById('headerSyncIndicator').classList.remove('hidden');
+        updateSyncStatus(dbService.isOnline ? 'online' : 'offline');
+      }
+      
+      // Set current date
+      updateCurrentDate();
+      
+      // Load initial data - jobs must load first before checking active timer
+      await loadSettings();
+      await loadJobs(); // Load jobs first
+      
+      // Force refresh sessions if coming from timer
+      const forceRefresh = !!needsRefresh;
+      await Promise.all([
+        loadTodaysSessions(forceRefresh),
+        checkActiveTimer() // Now safe to check timer after jobs loaded
+      ]);
+      
+      // Trigger animations
+      triggerStaggerAnimations();
+      
+      // Listen for DB changes
+      window.addEventListener('db-change', handleDbChange);
+      
+      // Listen for cross-tab updates
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'everwork_last_session_update') {
+          console.log('[Dashboard] Cross-tab session update detected');
+          loadTodaysSessions();
+          updateWeeklyHours();
+        }
+        if (e.key === 'everwork_dashboard_refresh') {
+          console.log('[Dashboard] Refresh requested from timer');
+          fullRefresh();
+        }
+        if (e.key === 'everwork_settings_updated') {
+          console.log('[Dashboard] Settings updated, refreshing');
+          loadSettings().then(() => {
+            updateProgress();
+          });
+        }
+      });
+      
+      // Setup pull-to-refresh
+      setupPullToRefresh();
+      
+      // Listen for online/offline
+      window.addEventListener('online', () => updateSyncStatus('online'));
+      window.addEventListener('offline', () => updateSyncStatus('offline'));
+      
+      // Refresh settings when page becomes visible (e.g., coming back from settings)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          console.log('[Dashboard] Page visible, refreshing settings');
+          loadSettings().then(() => {
+            updateProgress(); // Re-render with new goal
+          });
+        }
+      });
+    }
+    
+    function updateSyncStatus(status) {
+      const indicator = document.getElementById('headerSyncIndicator');
+      const syncText = document.getElementById('syncText');
+      
+      indicator.className = 'sync-indicator';
+      
+      switch(status) {
+        case 'online':
+          indicator.classList.add('sync-online');
+          if (syncText) syncText.textContent = 'Synced';
+          break;
+        case 'offline':
+          indicator.classList.add('sync-offline');
+          if (syncText) syncText.textContent = 'Offline';
+          break;
+        case 'syncing':
+          indicator.classList.add('sync-syncing');
+          if (syncText) syncText.textContent = 'Syncing...';
+          break;
+      }
+    }
+    
+    async function manualSync() {
+      if (!dbService.isOnline) {
+        showToast('You are offline', 'warning');
+        return;
+      }
+      
+      updateSyncStatus('syncing');
+      document.getElementById('syncBtn').classList.add('animate-spin');
+      
+      await dbService.syncOfflineQueue();
+      await dbService.fullSync();
+      await loadTodaysSessions();
+      
+      document.getElementById('syncBtn').classList.remove('animate-spin');
+      updateSyncStatus('online');
+      showToast('Synced successfully', 'success');
+    }
+    
+    function updateCurrentDate() {
+      // Use accurate time service if available, fallback to device time
+      const now = typeof timeService !== 'undefined' ? timeService.now() : new Date();
+      const options = { weekday: 'long', month: 'long', day: 'numeric' };
+      document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
+      
+      // Show time warning if clock manipulation detected
+      if (typeof timeService !== 'undefined' && timeService.isTimeManipulated()) {
+        const warning = timeService.getTimeWarning();
+        console.warn('[Dashboard]', warning);
+      }
+    }
+    
+    async function loadSettings() {
+      try {
+        const profile = await dbService.getProfile();
+        if (profile) {
+          // Check both camelCase and snake_case
+          dailyGoal = profile.dailyGoalHours || profile.daily_goal_hours || dailyGoal;
+        }
+        document.getElementById('goalText').textContent = `/ ${dailyGoal}h goal`;
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+    
+    async function loadJobs() {
+      try {
+        jobs = await dbService.getJobs();
+        renderJobGrid();
+      } catch (error) {
+        console.error('Error loading jobs:', error);
+        showToast('Error loading jobs', 'error');
+      }
+    }
+    
+    function renderJobGrid() {
+      const grid = document.getElementById('jobGrid');
+      
+      if (jobs.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-2 text-center py-10">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+              <i data-lucide="briefcase" class="w-8 h-8 text-white/30"></i>
+            </div>
+            <p class="text-white/50 mb-4">No jobs yet</p>
+            <button onclick="window.location.href = '/pages/jobs.html'" class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-medium">
+              Add Your First Job
+            </button>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+      
+      // Calculate today's hours for each job
+      const jobHours = {};
+      todaySessions.forEach(session => {
+        jobHours[session.job_id] = (jobHours[session.job_id] || 0) + (session.duration_seconds || 0);
+      });
+      
+      grid.innerHTML = jobs.map((job, index) => {
+        const todaySeconds = jobHours[job.id] || 0;
+        const todayHours = (todaySeconds / 3600).toFixed(1);
+        const isActive = activeTimer && activeTimer.job_id === job.id;
+        
+        return `
+          <div class="job-card card-lift card-glow stagger-item ${isActive ? 'active pulse-ring' : ''}" 
+               onclick="startJob('${job.id}')" 
+               style="animation-delay: ${index * 50}ms">
+            <div class="flex items-start justify-between mb-3">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center hover-scale" style="background: ${job.color}">
+                <i data-lucide="${job.icon || 'briefcase'}" class="w-5 h-5 text-white"></i>
+              </div>
+              <button class="p-1.5 rounded-full hover:bg-white/10 transition-colors hover-scale" onclick="event.stopPropagation(); startJob('${job.id}')">
+                <i data-lucide="${isActive ? 'pause-circle' : 'play-circle'}" class="w-6 h-6 text-[#FF9A56]"></i>
+              </button>
+            </div>
+            <h3 class="font-semibold truncate text-base">${escapeHtml(job.name)}</h3>
+            <p class="text-white/50 text-sm mt-1">${todayHours}h today</p>
+          </div>
+        `;
+      }).join('');
+      
+      lucide.createIcons();
+      
+      // Trigger stagger animations
+      setTimeout(() => {
+        document.querySelectorAll('.stagger-item').forEach(el => {
+          el.classList.add('stagger-item--visible');
+        });
+      }, 100);
+    }
+    
+    async function loadTodaysSessions(forceRefresh = false) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        console.log('[Dashboard] Loading sessions for:', today, 'forceRefresh:', forceRefresh);
+        todaySessions = await dbService.getSessions({ date: today }, forceRefresh);
+        console.log('[Dashboard] Loaded', todaySessions.length, 'sessions');
+        renderTimeline();
+        updateProgress();
+      } catch (error) {
+        console.error('Error loading sessions:', error);
+      }
+    }
+    
+    function renderTimeline() {
+      const list = document.getElementById('timelineList');
+      
+      if (todaySessions.length === 0) {
+        list.innerHTML = `
+          <div class="text-center py-10">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+              <i data-lucide="clock" class="w-8 h-8 text-white/30"></i>
+            </div>
+            <p class="text-white/50 font-medium">Ready to make today count?</p>
+            <p class="text-white/30 text-sm mt-1">Tap a job to start tracking</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+      
+      // Sort by start time (newest first)
+      const sorted = [...todaySessions].sort((a, b) => 
+        new Date(b.start_time) - new Date(a.start_time)
+      );
+      
+      list.innerHTML = sorted.map((session, index) => {
+        const job = jobs.find(j => j.id === session.job_id);
+        const startTime = new Date(session.start_time).toLocaleTimeString('en-US', { 
+          hour: '2-digit', minute: '2-digit', hour12: true 
+        });
+        const endTime = session.end_time 
+          ? new Date(session.end_time).toLocaleTimeString('en-US', { 
+              hour: '2-digit', minute: '2-digit', hour12: true 
+            })
+          : 'Now';
+        const duration = formatDuration(session.duration_seconds);
+        const edited = session.is_manually_edited ? '<span class="text-[#FBBF24] text-xs ml-1">(edited)</span>' : '';
+        
+        return `
+          <div class="timeline-item relative flex items-start gap-4 p-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.05] transition-colors group">
+            <div class="absolute left-[21px] top-12 bottom-[-16px] w-0.5 bg-white/10 ${index === sorted.length - 1 ? 'hidden' : ''}"></div>
+            <div class="w-3 h-3 rounded-full shrink-0 mt-1.5" style="background: ${job?.color || '#666'}"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="font-medium truncate">${escapeHtml(job?.name || 'Unknown Job')}</p>
+                ${edited}
+              </div>
+              <p class="text-white/50 text-sm">${startTime} - ${endTime}</p>
+              ${session.note ? `<p class="text-white/40 text-xs mt-1 italic">"${EverWorkValidation.escapeHtml(session.note)}"</p>` : ''}
+            </div>
+            <div class="text-right shrink-0">
+              <p class="font-mono text-sm">${duration}</p>
+              ${session.earnings ? `<p class="text-[#4ADE80] text-xs font-medium">+$${session.earnings.toFixed(2)}</p>` : ''}
+              <button onclick="editSession('${session.id}')" class="edit-btn mt-1 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+                <i data-lucide="pencil" class="w-3.5 h-3.5 text-white/60"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      lucide.createIcons();
+    }
+    
+    function updateProgress() {
+      const totalSeconds = todaySessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+      const totalHours = totalSeconds / 3600;
+      
+      // Animate number
+      animateNumber(document.getElementById('totalHours'), totalHours, 800);
+      
+      // Update circle
+      const circle = document.getElementById('progressCircle');
+      const circumference = 552.9;
+      const percentage = Math.min(totalHours / dailyGoal, 1);
+      const offset = circumference - (percentage * circumference);
+      circle.style.strokeDashoffset = offset;
+      
+      // Add glow effect when at 100%
+      if (percentage >= 1) {
+        circle.classList.add('progress-circle--glow');
+      } else {
+        circle.classList.remove('progress-circle--glow');
+      }
+      
+      // Celebrate when goal is reached (only once)
+      if (totalHours >= dailyGoal && !goalCelebrated) {
+        goalCelebrated = true;
+        if (window.interactions) {
+          window.interactions.celebrateGoal();
+        }
+      } else if (totalHours < dailyGoal) {
+        goalCelebrated = false;
+      }
+      
+      // Update quote
+      updateEncouragementQuote(totalHours);
+    }
+    
+    function updateWeeklyHours() {
+      // Calculate and display weekly hours if element exists
+      const weekHoursEl = document.getElementById('weekHours');
+      if (!weekHoursEl || !todaySessions) return;
+      
+      // Get current week's sessions (Sunday to Saturday)
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - dayOfWeek);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      // Filter sessions for this week
+      const weekSessions = todaySessions.filter(s => {
+        const sessionDate = new Date(s.date);
+        return sessionDate >= weekStart;
+      });
+      
+      const weekSeconds = weekSessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+      const weekHours = (weekSeconds / 3600).toFixed(1);
+      
+      weekHoursEl.textContent = weekHours;
+    }
+    
+    function animateNumber(element, target, duration) {
+      const start = parseFloat(element.textContent) || 0;
+      const startTime = performance.now();
+      
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = start + (target - start) * eased;
+        
+        element.textContent = current.toFixed(1);
+        
+        if (progress < 1) requestAnimationFrame(update);
+      }
+      
+      requestAnimationFrame(update);
+    }
+    
+    function updateEncouragementQuote(hours) {
+      const quoteEl = document.getElementById('encouragementQuote');
+      
+      if (hours === 0) {
+        quoteEl.textContent = "Ready to crush your goals?";
+      } else if (hours >= dailyGoal) {
+        quoteEl.textContent = "Goal crushed! You're amazing! 🎉";
+      } else if (hours >= dailyGoal * 0.75) {
+        quoteEl.textContent = "So close! Keep pushing! 💪";
+      } else if (hours >= dailyGoal * 0.5) {
+        quoteEl.textContent = "Halfway there! Great work! 🔥";
+      } else {
+        quoteEl.textContent = encouragementQuotes[Math.floor(Math.random() * encouragementQuotes.length)];
+      }
+    }
+    
+    // ============================================
+    // Timer Functions
+    // ============================================
+    
+    async function checkActiveTimer() {
+      try {
+        // Step 1: Get active timer from database (source of truth)
+        activeTimer = await dbService.getActiveTimer();
+        
+        if (activeTimer) {
+          // Sync to localStorage so timer page can pick it up
+          localStorage.setItem('activeTimer', JSON.stringify({
+            id: activeTimer.id,
+            jobId: activeTimer.jobId || activeTimer.job_id,
+            sessionId: activeTimer.sessionId,
+            startTime: activeTimer.serverStartTime || activeTimer.clientStartTime,
+            note: activeTimer.note || ''
+          }));
+          
+          // Step 2: Verify job exists
+          const job = jobs.find(j => j.id === activeTimer.job_id || j.id === activeTimer.jobId);
+          
+          if (!job) {
+            // Job not found - don't delete session, just log warning and hide banner
+            // The job might still be loading or temporarily unavailable
+            console.warn('[Dashboard] Timer exists but job not found (jobs may still be loading)');
+            document.getElementById('activeTimerBanner').classList.add('hidden');
+            return;
+          }
+          
+          // Step 3: Show banner with valid data
+          showActiveBanner(job);
+          startBannerTimer();
+        } else {
+          // No active timer in database - clear localStorage and hide banner
+          localStorage.removeItem('activeTimer');
+          document.getElementById('activeTimerBanner').classList.add('hidden');
+          if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+          }
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error checking active timer:', error);
+        document.getElementById('activeTimerBanner').classList.add('hidden');
+      }
+    }
+    
+    function showActiveBanner(job) {
+      const banner = document.getElementById('activeTimerBanner');
+      document.getElementById('activeJobColor').style.background = job?.color || 'linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)';
+      document.getElementById('activeJobIcon').setAttribute('data-lucide', job?.icon || 'briefcase');
+      document.getElementById('activeJobName').textContent = job?.name || 'Unknown Job';
+      banner.classList.remove('hidden');
+      lucide.createIcons();
+    }
+    
+    function startBannerTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      
+      async function update() {
+        if (activeTimer) {
+          const elapsed = await dbService.getElapsedTime(activeTimer.id);
+          document.getElementById('activeTimerDisplay').textContent = formatTime(elapsed);
+        }
+      }
+      
+      update();
+      timerInterval = setInterval(update, 1000);
+    }
+    
+    async function startJob(jobId) {
+      // Check if timer already running
+      if (activeTimer) {
+        if (activeTimer.job_id === jobId) {
+          goToTimer();
+          return;
+        }
+        showToast('Stop current timer first', 'warning');
+        goToTimer();
+        return;
+      }
+      
+      try {
+        // Clear any stale timer data first
+        localStorage.removeItem('activeTimer');
+        
+        const result = await dbService.startTimer(jobId);
+        
+        if (result.success) {
+          activeTimer = result.timer;
+          
+          // Save fresh timer data to localStorage
+          localStorage.setItem('activeTimer', JSON.stringify({
+            id: result.timer.id,
+            jobId: jobId,
+            sessionId: result.session.id,
+            startTime: result.timer.serverStartTime,
+            note: ''
+          }));
+          
+          const job = jobs.find(j => j.id === jobId);
+          showActiveBanner(job);
+          startBannerTimer();
+          goToTimer();
+        } else {
+          showToast(result.error || 'Failed to start timer', 'error');
+        }
+      } catch (error) {
+        console.error('Start job error:', error);
+        showToast('Failed to start timer', 'error');
+      }
+    }
+    
+    function goToTimer() {
+      window.location.href = '/pages/timer.html';
+    }
+    
+    // Stop timer from banner
+    async function stopTimerFromBanner() {
+      if (!activeTimer) return;
+      
+      if (!confirm('Stop the current timer and save the session?')) return;
+      
+      try {
+        const result = await dbService.stopTimer(activeTimer.id, activeTimer.sessionId);
+        
+        if (result.success) {
+          showToast(`Timer stopped! ${formatDuration(result.duration)} logged.`, 'success');
+          activeTimer = null;
+          document.getElementById('activeTimerBanner').classList.add('hidden');
+          if (timerInterval) clearInterval(timerInterval);
+          await loadTodaysSessions();
+        } else {
+          showToast(result.error || 'Failed to stop timer', 'error');
+        }
+      } catch (error) {
+        console.error('Stop timer error:', error);
+        showToast('Failed to stop timer', 'error');
+      }
+    }
+    
+    // Cancel/delete timer from banner (without saving)
+    async function cancelTimerFromBanner() {
+      if (!activeTimer) {
+        // Just clear localStorage if no active timer in db
+        localStorage.removeItem('activeTimer');
+        document.getElementById('activeTimerBanner').classList.add('hidden');
+        showToast('Timer cleared', 'info');
+        return;
+      }
+      
+      if (!confirm('Cancel this timer? The time will not be saved.')) return;
+      
+      try {
+        // Delete the timer from database
+        await dbService.deleteSession(activeTimer.sessionId);
+        
+        activeTimer = null;
+        localStorage.removeItem('activeTimer');
+        document.getElementById('activeTimerBanner').classList.add('hidden');
+        if (timerInterval) clearInterval(timerInterval);
+        
+        showToast('Timer cancelled', 'info');
+      } catch (error) {
+        console.error('Cancel timer error:', error);
+        // Still clear local state even if db fails
+        localStorage.removeItem('activeTimer');
+        activeTimer = null;
+        document.getElementById('activeTimerBanner').classList.add('hidden');
+        showToast('Timer cleared', 'info');
+      }
+    }
+    
+    // ============================================
+    // Quick Start Bottom Sheet
+    // ============================================
+    
+    function showQuickStart() {
+      if (activeTimer) {
+        goToTimer();
+        return;
+      }
+      
+      const sheet = document.getElementById('quickStartSheet');
+      const content = document.getElementById('quickStartContent');
+      const container = document.getElementById('quickStartJobs');
+      
+      if (jobs.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8">
+            <p class="text-white/50 mb-4">No jobs yet</p>
+            <button onclick="closeQuickStart(); window.location.href = '/pages/jobs.html';" class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-medium">
+              Add Your First Job
+            </button>
+          </div>
+        `;
+      } else {
+        container.innerHTML = jobs.map(job => `
+          <button onclick="startJob('${job.id}')" class="w-full flex items-center gap-4 p-4 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] transition-colors text-left">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background: ${job.color}">
+              <i data-lucide="${job.icon || 'briefcase'}" class="w-6 h-6 text-white"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-medium truncate">${escapeHtml(job.name)}</p>
+              ${job.hourly_rate ? `<p class="text-white/50 text-sm">$${job.hourly_rate}/hr</p>` : ''}
+            </div>
+            <i data-lucide="chevron-right" class="w-5 h-5 text-white/30"></i>
+          </button>
+        `).join('');
+      }
+      
+      sheet.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        content.classList.add('open');
+        sheet.querySelector('.bottom-sheet-overlay').classList.add('open');
+      });
+      
+      lucide.createIcons();
+    }
+    
+    function closeQuickStart() {
+      const sheet = document.getElementById('quickStartSheet');
+      const content = document.getElementById('quickStartContent');
+      const overlay = sheet.querySelector('.bottom-sheet-overlay');
+      
+      content.classList.remove('open');
+      overlay.classList.remove('open');
+      
+      setTimeout(() => sheet.classList.add('hidden'), 300);
+    }
+    
+    // ============================================
+    // Edit Session
+    // ============================================
+    
+    let editingSessionId = null;
+    
+    async function editSession(sessionId) {
+      const session = todaySessions.find(s => s.id === sessionId);
+      if (!session) return;
+      
+      editingSessionId = sessionId;
+      
+      // Populate job options
+      const jobSelect = document.getElementById('editJobId');
+      jobSelect.innerHTML = jobs.map(j => 
+        `<option value="${j.id}" ${j.id === session.job_id ? 'selected' : ''}>${escapeHtml(j.name)}</option>`
+      ).join('');
+      
+      // Set values
+      document.getElementById('editSessionId').value = sessionId;
+      document.getElementById('editDate').value = session.date;
+      document.getElementById('editStartTime').value = formatDateTimeLocal(session.start_time);
+      document.getElementById('editEndTime').value = session.end_time ? formatDateTimeLocal(session.end_time) : formatDateTimeLocal(new Date());
+      document.getElementById('editNote').value = session.note || '';
+      document.getElementById('editNoteCount').textContent = (session.note || '').length;
+      
+      updateEditDuration();
+      
+      // Show modal
+      const modal = document.getElementById('editSessionModal');
+      modal.classList.remove('hidden');
+    }
+    
+    function closeEditSession() {
+      document.getElementById('editSessionModal').classList.add('hidden');
+      editingSessionId = null;
+    }
+    
+    document.getElementById('editSessionForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const jobId = document.getElementById('editJobId').value;
+      const startTime = new Date(document.getElementById('editStartTime').value).toISOString();
+      const endTime = new Date(document.getElementById('editEndTime').value).toISOString();
+      
+      // Calculate duration
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      const durationSeconds = Math.floor((end - start) / 1000);
+      
+      if (durationSeconds <= 0) {
+        showToast('End time must be after start time', 'error');
+        return;
+      }
+      
+      // Calculate earnings if job has rate
+      const job = jobs.find(j => j.id === jobId);
+      let earnings = 0;
+      if (job?.hourly_rate) {
+        earnings = (durationSeconds / 3600) * job.hourly_rate;
+      }
+      
+      // Use camelCase to match Firestore schema
+      const updates = {
+        jobId: jobId,
+        date: document.getElementById('editDate').value,
+        startTime: startTime,
+        endTime: endTime,
+        durationSeconds: durationSeconds,
+        note: document.getElementById('editNote').value,
+        earnings: earnings
+      };
+      
+      try {
+        const result = await dbService.updateSession(editingSessionId, updates);
+        
+        if (result.success) {
+          showToast('Session updated', 'success');
+          closeEditSession();
+          await loadTodaysSessions();
+        } else {
+          showToast(result.error || 'Failed to update', 'error');
+        }
+      } catch (error) {
+        showToast('Failed to update session', 'error');
+      }
+    });
+    
+    async function deleteSession() {
+      if (!editingSessionId) return;
+      
+      if (!confirm('Delete this session?')) return;
+      
+      try {
+        const result = await dbService.deleteSession(editingSessionId);
+        
+        if (result.success) {
+          showToast('Session deleted', 'success');
+          closeEditSession();
+          await loadTodaysSessions();
+        } else {
+          showToast(result.error || 'Failed to delete', 'error');
+        }
+      } catch (error) {
+        showToast('Failed to delete session', 'error');
+      }
+    }
+    
+    // Duration calculation for edit form
+    document.getElementById('editStartTime')?.addEventListener('change', updateEditDuration);
+    document.getElementById('editEndTime')?.addEventListener('change', updateEditDuration);
+    
+    function updateEditDuration() {
+      const start = new Date(document.getElementById('editStartTime').value);
+      const end = new Date(document.getElementById('editEndTime').value);
+      const seconds = Math.floor((end - start) / 1000);
+      document.getElementById('editDuration').textContent = formatDuration(seconds);
+    }
+    
+    document.getElementById('editNote')?.addEventListener('input', (e) => {
+      document.getElementById('editNoteCount').textContent = e.target.value.length;
+    });
+    
+    // ============================================
+    // Add Manual Session
+    // ============================================
+    
+    function showAddManualSession() {
+      if (jobs.length === 0) {
+        showToast('Create a job first', 'warning');
+        window.location.href = '/pages/jobs.html';
+        return;
+      }
+      
+      // Populate job options
+      const jobSelect = document.getElementById('manualJobId');
+      jobSelect.innerHTML = '<option value="">Select a job</option>' + 
+        jobs.map(j => `<option value="${j.id}">${escapeHtml(j.name)}</option>`).join('');
+      
+      // Set defaults
+      document.getElementById('manualDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('manualStartTime').value = '09:00';
+      document.getElementById('manualEndTime').value = '17:00';
+      document.getElementById('manualNote').value = '';
+      
+      updateManualDuration();
+      
+      document.getElementById('addManualSessionModal').classList.remove('hidden');
+    }
+    
+    function closeAddManualSession() {
+      document.getElementById('addManualSessionModal').classList.add('hidden');
+    }
+    
+    document.getElementById('addManualSessionForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const jobId = document.getElementById('manualJobId').value;
+      const date = document.getElementById('manualDate').value;
+      const startTime = document.getElementById('manualStartTime').value;
+      const endTime = document.getElementById('manualEndTime').value;
+      const note = document.getElementById('manualNote').value;
+      
+      if (!jobId) {
+        showToast('Please select a job', 'warning');
+        return;
+      }
+      
+      // Build datetime strings
+      const startDateTime = new Date(`${date}T${startTime}`);
+      const endDateTime = new Date(`${date}T${endTime}`);
+      
+      const durationSeconds = Math.floor((endDateTime - startDateTime) / 1000);
+      
+      if (durationSeconds <= 0) {
+        showToast('End time must be after start time', 'error');
+        return;
+      }
+      
+      // Calculate earnings
+      const job = jobs.find(j => j.id === jobId);
+      let earnings = 0;
+      if (job?.hourly_rate) {
+        earnings = (durationSeconds / 3600) * job.hourly_rate;
+      }
+      
+      try {
+        const result = await dbService.createSession({
+          jobId,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          duration: durationSeconds,
+          date,
+          note,
+          earnings
+        });
+        
+        if (result.success) {
+          showToast('Session added', 'success');
+          closeAddManualSession();
+          await loadTodaysSessions();
+        } else {
+          showToast(result.error || 'Failed to add session', 'error');
+        }
+      } catch (error) {
+        showToast('Failed to add session', 'error');
+      }
+    });
+    
+    document.getElementById('manualStartTime')?.addEventListener('change', updateManualDuration);
+    document.getElementById('manualEndTime')?.addEventListener('change', updateManualDuration);
+    
+    function updateManualDuration() {
+      const start = document.getElementById('manualStartTime').value;
+      const end = document.getElementById('manualEndTime').value;
+      
+      if (start && end) {
+        const date = document.getElementById('manualDate').value || new Date().toISOString().split('T')[0];
+        const startDate = new Date(`${date}T${start}`);
+        const endDate = new Date(`${date}T${end}`);
+        const seconds = Math.floor((endDate - startDate) / 1000);
+        document.getElementById('manualDuration').textContent = formatDuration(seconds);
+      }
+    }
+    
+    // ============================================
+    // Utilities
+    // ============================================
+    
+    function formatTime(seconds) {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function formatDuration(seconds) {
+      if (!seconds || seconds < 0) return '0m';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      if (hrs > 0) return `${hrs}h ${mins}m`;
+      return `${mins}m`;
+    }
+    
+    function formatDateTimeLocal(dateString) {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function triggerStaggerAnimations() {
+      const items = document.querySelectorAll('.stagger-item');
+      items.forEach((item, index) => {
+        setTimeout(() => item.classList.add('visible'), index * 80);
+      });
+    }
+    
+    function handleDbChange(event) {
+      const { table, data, type } = event.detail;
+      console.log('[Dashboard] DB change:', table, type);
+      
+      if (table === 'sessions') {
+        // Refresh today's sessions
+        loadTodaysSessions();
+        // Refresh weekly hours display
+        updateWeeklyHours();
+        // Also refresh active timer in case a session was completed
+        checkActiveTimer();
+      } else if (table === 'jobs') {
+        loadJobs();
+        // Refresh timer display in case job details changed
+        if (activeTimer) {
+          const job = jobs.find(j => j.id === activeTimer.job_id || j.id === activeTimer.jobId);
+          if (job) showActiveBanner(job);
+        }
+      }
+    }
+    
+    // Pull to refresh functionality
+    let pullStartY = 0;
+    let isPulling = false;
+    const PULL_THRESHOLD = 80;
+    
+    function setupPullToRefresh() {
+      const main = document.getElementById('mainContent');
+      if (!main) return;
+      
+      main.addEventListener('touchstart', (e) => {
+        if (main.scrollTop === 0) {
+          pullStartY = e.touches[0].clientY;
+          isPulling = true;
+        }
+      }, { passive: true });
+      
+      main.addEventListener('touchmove', (e) => {
+        if (!isPulling) return;
+        
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - pullStartY;
+        
+        if (diff > 0 && main.scrollTop === 0) {
+          const indicator = document.getElementById('pullIndicator');
+          const icon = document.getElementById('pullIcon');
+          const text = document.getElementById('pullText');
+          
+          // Show indicator with pull progress
+          const pullProgress = Math.min(diff / PULL_THRESHOLD, 1);
+          indicator.style.transform = `translateY(${Math.min(diff * 0.5, 60)}px)`;
+          
+          if (diff >= PULL_THRESHOLD) {
+            text.textContent = 'Release to refresh';
+            icon.classList.add('text-[#FF9A56]');
+          } else {
+            text.textContent = 'Pull to refresh';
+            icon.classList.remove('text-[#FF9A56]');
+          }
+        }
+      }, { passive: true });
+      
+      main.addEventListener('touchend', () => {
+        if (!isPulling) return;
+        isPulling = false;
+        
+        const indicator = document.getElementById('pullIndicator');
+        const currentTransform = indicator.style.transform;
+        const currentY = parseInt(currentTransform.replace('translateY(', '').replace('px)', '')) || 0;
+        
+        if (currentY >= PULL_THRESHOLD * 0.5) {
+          // Trigger refresh
+          indicator.style.transform = 'translateY(60px)';
+          document.getElementById('pullText').textContent = 'Refreshing...';
+          document.getElementById('pullIcon').classList.add('animate-spin');
+          
+          fullRefresh().then(() => {
+            setTimeout(() => {
+              indicator.style.transform = 'translateY(-100%)';
+              document.getElementById('pullIcon').classList.remove('animate-spin');
+            }, 500);
+          });
+        } else {
+          // Hide indicator
+          indicator.style.transform = 'translateY(-100%)';
+        }
+      });
+    }
+    
+    // Full refresh of all data
+    async function fullRefresh() {
+      console.log('[Dashboard] Full refresh started');
+      updateSyncStatus('syncing');
+      
+      try {
+        // Clear caches
+        sessionsCache = [];
+        
+        // Reload everything
+        await loadJobs();
+        await loadTodaysSessions();
+        await updateWeeklyHours();
+        await checkActiveTimer();
+        
+        showToast('Data refreshed', 'success');
+        updateSyncStatus('online');
+      } catch (error) {
+        console.error('[Dashboard] Refresh error:', error);
+        showToast('Refresh failed', 'error');
+        updateSyncStatus('offline');
+      }
+    }
+    
+    function navigateTo(view) {
+      window.location.href = `/pages/${view}.html`;
+    }
+    
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const colors = {
+        info: 'bg-white/90 text-black',
+        success: 'bg-[#4ADE80]/90 text-black',
+        warning: 'bg-[#FBBF24]/90 text-black',
+        error: 'bg-[#F87171]/90 text-white'
+      };
+      
+      toast.className = `toast px-6 py-3 rounded-full text-sm font-medium shadow-lg ${colors[type]}`;
+      toast.textContent = message;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(-20px)';
+        toast.style.transition = 'all 300ms ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', init);
+    
+    // Expose functions to window scope for HTML onclick handlers
+    window.editSession = editSession;
+    window.closeEditSession = closeEditSession;
+    window.deleteSession = deleteSession;
+    window.startJob = startJob;
+    window.closeAddManualSession = closeAddManualSession;
+    window.stopTimerFromBanner = stopTimerFromBanner;
+    window.cancelTimerFromBanner = cancelTimerFromBanner;
+    window.manualSync = manualSync;
+    
+    } catch (err) {
+      console.error('[Dashboard] Script initialization error:', err);
+      alert('Error initializing dashboard: ' + err.message);
+    }
+  </script>
+</body>
+</html>

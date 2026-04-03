@@ -1,0 +1,8 @@
+connectorId: example
+generate:
+  javascriptSdk:
+    - outputDir: ..\..\KIMI Skill\src\dataconnect-generated
+      package: "@dataconnect/generated"
+      packageJsonDir: ..\..\KIMI Skill
+      react: false
+      angular: false

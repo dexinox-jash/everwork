@@ -1,0 +1,33 @@
+<!-- 
+  Ever Work - Bottom Navigation Component
+  Fixed bottom navigation with 5 items: Dashboard, Timer, Jobs, Calendar, Settings
+  Note: Include this at the end of each page's body tag
+-->
+
+<nav class="bottom-nav" role="navigation" aria-label="Main navigation">
+  <a href="#dashboard" class="bottom-nav-item" data-view="dashboard" aria-label="Dashboard">
+    <i data-lucide="layout-dashboard"></i>
+    <span>Home</span>
+  </a>
+  
+  <a href="#jobs" class="bottom-nav-item" data-view="jobs" aria-label="Jobs">
+    <i data-lucide="briefcase"></i>
+    <span>Jobs</span>
+  </a>
+  
+  <!-- Timer is typically a full-screen overlay, but included for completeness -->
+  <a href="#timer" class="bottom-nav-item" data-view="timer" aria-label="Timer" style="display: none;">
+    <i data-lucide="clock"></i>
+    <span>Timer</span>
+  </a>
+  
+  <a href="#calendar" class="bottom-nav-item" data-view="calendar" aria-label="Calendar">
+    <i data-lucide="calendar"></i>
+    <span>Calendar</span>
+  </a>
+  
+  <a href="#settings" class="bottom-nav-item" data-view="settings" aria-label="Settings">
+    <i data-lucide="settings"></i>
+    <span>Settings</span>
+  </a>
+</nav>

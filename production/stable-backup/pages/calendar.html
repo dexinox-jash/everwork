@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+  <meta name="theme-color" content="#0F0F13">
+  <title>Analytics | Ever Work</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS v4 -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Shared Scripts -->
+  <script src="../shared/config.js"></script>
+  <script src="../shared/time-service.js"></script>
+  <script src="../shared/firebase-service.js"></script>
+  <script src="../shared/scripts.js"></script>
+  
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      box-sizing: border-box;
+    }
+    
+    html {
+      font-size: 16px;
+    }
+    
+    @media (max-width: 640px) {
+      html { font-size: 14px; }
+      
+      .heatmap-cell {
+        font-size: 10px;
+        min-height: 32px;
+        border-radius: 6px;
+      }
+      
+      .stat-card {
+        padding: 16px;
+        border-radius: 12px;
+      }
+      
+      .record-card {
+        padding: 12px;
+      }
+      
+      .record-icon {
+        width: 40px;
+        height: 40px;
+      }
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #0F0F13;
+      color: #FFFFFF;
+      min-height: 100vh;
+      padding-bottom: calc(80px + env(safe-area-inset-bottom));
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* Page-specific styles */
+    .heatmap-cell {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 500;
+      min-height: 40px;
+    }
+    
+    @media (max-width: 640px) {
+      .heatmap-cell {
+        font-size: 10px;
+        min-height: 36px;
+      }
+    }
+    
+    .heatmap-cell:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 12px rgba(255, 154, 86, 0.3);
+      z-index: 10;
+    }
+    
+    .heatmap-cell.today {
+      border: 2px solid rgba(255, 255, 255, 0.8);
+    }
+    
+    .stat-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: blur(20px);
+      transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .stat-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    
+    .record-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .record-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      transform: translateY(-2px);
+    }
+    
+    .record-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .week-bar {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      min-height: 4px;
+      transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .week-bar-fill {
+      background: linear-gradient(180deg, #FF9A56 0%, #FF6B6B 100%);
+      border-radius: 4px;
+      transition: height 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Animations */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes heatmapCellIn {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    @keyframes barGrow {
+      from { transform: scaleY(0); }
+      to { transform: scaleY(1); }
+    }
+    
+    .animate-fade-in-up {
+      animation: fadeInUp 500ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    
+    .animate-heatmap-cell {
+      animation: heatmapCellIn 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    
+    .animate-bar-grow {
+      animation: barGrow 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      transform-origin: bottom;
+    }
+    
+    /* Stagger delays */
+    .stagger-1 { animation-delay: 50ms; }
+    .stagger-2 { animation-delay: 100ms; }
+    .stagger-3 { animation-delay: 150ms; }
+    .stagger-4 { animation-delay: 200ms; }
+    .stagger-5 { animation-delay: 250ms; }
+    
+    /* Day modal */
+    .day-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    
+    .day-modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .day-modal.open .day-modal-overlay {
+      opacity: 1;
+    }
+    
+    .day-modal-content {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      max-height: 70vh;
+      background: #1A1A1F;
+      border-radius: 24px 24px 0 0;
+      padding: 24px;
+      transform: translateY(100%);
+      transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      overflow-y: auto;
+    }
+    
+    .day-modal.open .day-modal-content {
+      transform: translateY(0);
+    }
+    
+    .day-modal-handle {
+      width: 40px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+    
+    .session-item {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .session-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .session-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    /* Comparison indicator */
+    .comparison-up { color: #4ADE80; }
+    .comparison-down { color: #F87171; }
+    .comparison-same { color: rgba(255, 255, 255, 0.5); }
+    
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .animate-fade-in-up,
+      .animate-heatmap-cell,
+      .animate-bar-grow {
+        animation: none;
+        opacity: 1;
+        transform: none;
+      }
+      
+      .heatmap-cell,
+      .week-bar-fill {
+        transition: none;
+      }
+    }
+    
+    /* Ensure hidden class works */
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Safe area utilities */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    /* Touch optimization */
+    .touch-manipulation {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    button, a {
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body class="bg-[#0F0F13] text-white min-h-screen pb-28">
+  <!-- Header -->
+  <header class="px-5 py-6 animate-fade-in-up">
+    <h1 class="text-2xl font-bold">Your Progress</h1>
+    <p class="text-white/50 mt-1">Track your hustle over time</p>
+  </header>
+
+  <main class="px-5 space-y-8">
+    <!-- Weekly Summary Card -->
+    <section class="stat-card" style="opacity: 1;">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] flex items-center justify-center">
+          <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold">This Week</h2>
+          <p class="text-white/50 text-sm">Keep up the momentum!</p>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-3 gap-4">
+        <div class="text-center">
+          <p id="weekHours" class="text-3xl font-bold font-mono text-[#FF9A56]">0</p>
+          <p class="text-white/50 text-sm">hours</p>
+        </div>
+        <div class="text-center">
+          <p id="weekSessions" class="text-3xl font-bold font-mono">0</p>
+          <p class="text-white/50 text-sm">sessions</p>
+        </div>
+        <div class="text-center">
+          <p id="weekEarnings" class="text-3xl font-bold font-mono text-[#4ADE80]">$0</p>
+          <p class="text-white/50 text-sm">earned</p>
+        </div>
+      </div>
+      
+      <!-- Weekly Comparison -->
+      <div id="weeklyComparison" class="mt-4 flex items-center justify-center gap-2 text-sm">
+        <!-- Injected dynamically -->
+      </div>
+      
+      <!-- Weekly Mini Bar Chart -->
+      <div class="mt-4 pt-4 border-t border-white/10">
+        <div class="flex items-end justify-between gap-2 h-16" id="weeklyBars">
+          <!-- Bars injected dynamically -->
+        </div>
+        <div class="flex justify-between mt-2 text-xs text-white/40">
+          <span>Sun</span>
+          <span>Mon</span>
+          <span>Tue</span>
+          <span>Wed</span>
+          <span>Thu</span>
+          <span>Fri</span>
+          <span>Sat</span>
+        </div>
+      </div>
+      
+      <div id="motivationalMessage" class="mt-4 p-3 rounded-xl bg-white/5 text-center text-sm text-white/70">
+        <!-- Dynamic message injected here -->
+      </div>
+    </section>
+
+    <!-- Monthly Heatmap -->
+    <section>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Activity Heatmap</h2>
+        <div class="flex items-center gap-1">
+          <button onclick="window.changeYear(-1)" class="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors active:scale-95 touch-manipulation" title="Previous Year" style="min-width: 44px; min-height: 44px;">
+            <i data-lucide="chevrons-left" class="w-4 h-4"></i>
+          </button>
+          <button onclick="window.changeMonth(-1)" class="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors active:scale-95 touch-manipulation" title="Previous Month" style="min-width: 44px; min-height: 44px;">
+            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+          </button>
+          <span id="currentMonth" class="font-medium min-w-[100px] text-center text-sm px-2">Mar 2025</span>
+          <button onclick="window.changeMonth(1)" class="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors active:scale-95 touch-manipulation" title="Next Month" style="min-width: 44px; min-height: 44px;">
+            <i data-lucide="chevron-right" class="w-5 h-5"></i>
+          </button>
+          <button onclick="window.changeYear(1)" class="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors active:scale-95 touch-manipulation" title="Next Year" style="min-width: 44px; min-height: 44px;">
+            <i data-lucide="chevrons-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Day labels -->
+      <div class="grid grid-cols-7 gap-1 mb-2">
+        <div class="text-center text-white/40 text-xs">S</div>
+        <div class="text-center text-white/40 text-xs">M</div>
+        <div class="text-center text-white/40 text-xs">T</div>
+        <div class="text-center text-white/40 text-xs">W</div>
+        <div class="text-center text-white/40 text-xs">T</div>
+        <div class="text-center text-white/40 text-xs">F</div>
+        <div class="text-center text-white/40 text-xs">S</div>
+      </div>
+      
+      <!-- Heatmap grid -->
+      <div id="heatmapGrid" class="grid grid-cols-7 gap-1">
+        <!-- Heatmap cells injected here -->
+      </div>
+      
+      <!-- Legend -->
+      <div class="flex items-center justify-center gap-4 mt-4 text-sm text-white/50">
+        <span>Less</span>
+        <div class="flex gap-1">
+          <div class="w-4 h-4 rounded" style="background: rgba(255, 255, 255, 0.05);"></div>
+          <div class="w-4 h-4 rounded" style="background: rgba(255, 154, 86, 0.25);"></div>
+          <div class="w-4 h-4 rounded" style="background: rgba(255, 154, 86, 0.45);"></div>
+          <div class="w-4 h-4 rounded" style="background: rgba(255, 154, 86, 0.65);"></div>
+          <div class="w-4 h-4 rounded" style="background: rgba(255, 154, 86, 0.85);"></div>
+          <div class="w-4 h-4 rounded" style="background: #FF9A56;"></div>
+        </div>
+        <span>More</span>
+      </div>
+    </section>
+
+    <!-- Personal Records -->
+    <section>
+      <h2 class="text-lg font-semibold mb-4">Personal Records</h2>
+      <div class="space-y-3">
+        <div class="record-card">
+          <div class="record-icon" style="background: rgba(255, 215, 0, 0.15);">
+            <i data-lucide="trophy" class="w-6 h-6 text-[#FFD700]"></i>
+          </div>
+          <div class="flex-1">
+            <p class="text-white/50 text-sm">Longest Session</p>
+            <p id="longestSession" class="text-xl font-semibold">--</p>
+          </div>
+        </div>
+        
+        <div class="record-card">
+          <div class="record-icon" style="background: rgba(74, 222, 128, 0.15);">
+            <i data-lucide="calendar-check" class="w-6 h-6 text-[#4ADE80]"></i>
+          </div>
+          <div class="flex-1">
+            <p class="text-white/50 text-sm">Most Productive Day</p>
+            <p id="mostProductiveDay" class="text-xl font-semibold">--</p>
+          </div>
+        </div>
+        
+        <div class="record-card">
+          <div class="record-icon" style="background: rgba(96, 165, 250, 0.15);">
+            <i data-lucide="flame" class="w-6 h-6 text-[#60A5FA]"></i>
+          </div>
+          <div class="flex-1">
+            <p class="text-white/50 text-sm">Current Streak</p>
+            <p id="currentStreak" class="text-xl font-semibold">--</p>
+          </div>
+        </div>
+        
+        <div class="record-card">
+          <div class="record-icon" style="background: rgba(255, 107, 107, 0.15);">
+            <i data-lucide="dollar-sign" class="w-6 h-6 text-[#FF6B6B]"></i>
+          </div>
+          <div class="flex-1">
+            <p class="text-white/50 text-sm">Best Earning Week</p>
+            <p id="bestEarningWeek" class="text-xl font-semibold">--</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Earnings Projection -->
+    <section id="earningsProjection" class="hidden" style="opacity: 1;">
+      <h2 class="text-lg font-semibold mb-4">Earnings Projection</h2>
+      <div class="stat-card">
+        <p class="text-white/70 mb-2">At your current pace, you'll make approximately:</p>
+        <p id="projectedEarnings" class="text-3xl font-bold text-[#4ADE80]">$0</p>
+        <p class="text-white/50 text-sm mt-1">by the end of this month</p>
+      </div>
+    </section>
+
+    <!-- Day Detail Modal -->
+    <div id="dayModal" class="day-modal hidden">
+      <div class="day-modal-overlay" onclick="window.closeDayModal()"></div>
+      <div class="day-modal-content">
+        <div class="day-modal-handle"></div>
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h3 id="dayModalTitle" class="text-xl font-semibold">March 15, 2025</h3>
+            <p id="dayModalTotal" class="text-white/50 text-sm mt-1">0 hours total</p>
+          </div>
+          <button onclick="window.closeDayModal()" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors active:scale-95">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div id="dayModalContent" class="space-y-3">
+          <!-- Day sessions injected here -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-[#1A1A1F]/95 backdrop-blur-xl border-t border-white/10 px-2 py-2 pb-safe z-40">
+    <div class="flex justify-around items-center max-w-md mx-auto">
+      <a href="/pages/dashboard.html" class="flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors p-2" style="min-width: 60px;">
+        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+        <span class="text-[10px]">Home</span>
+      </a>
+      <a href="/pages/timer.html" class="flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors p-2" style="min-width: 60px;">
+        <i data-lucide="clock" class="w-5 h-5"></i>
+        <span class="text-[10px]">Timer</span>
+      </a>
+      <a href="/pages/jobs.html" class="flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors p-2" style="min-width: 60px;">
+        <i data-lucide="briefcase" class="w-5 h-5"></i>
+        <span class="text-[10px]">Jobs</span>
+      </a>
+      <a href="/pages/calendar.html" class="flex flex-col items-center gap-1 text-[#FF9A56] p-2" style="min-width: 60px;">
+        <i data-lucide="calendar" class="w-5 h-5"></i>
+        <span class="text-[10px]">Stats</span>
+      </a>
+      <a href="/pages/settings.html" class="flex flex-col items-center gap-1 text-white/50 hover:text-white/80 transition-colors p-2" style="min-width: 60px;">
+        <i data-lucide="settings" class="w-5 h-5"></i>
+        <span class="text-[10px]">Settings</span>
+      </a>
+    </div>
+  </nav>
+
+  <script>
+    // ============================================
+    // STATS PAGE - Clean Architecture
+    // ============================================
+    
+    // ============================================
+    // STATE MANAGEMENT
+    // ============================================
+    const StatsState = {
+      currentDate: new Date(),
+      sessionsCache: [],
+      jobsCache: [],
+      isLoading: false,
+      
+      // Get sessions for a specific date range
+      getSessionsForRange(startDate, endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return this.sessionsCache.filter(s => {
+          const sessionDate = new Date(s.date);
+          return sessionDate >= start && sessionDate <= end;
+        });
+      },
+      
+      // Get sessions for a specific day
+      getSessionsForDay(dateStr) {
+        return this.sessionsCache.filter(s => s.date === dateStr);
+      },
+      
+      // Get total hours for a date
+      getHoursForDate(dateStr) {
+        const sessions = this.getSessionsForDay(dateStr);
+        return sessions.reduce((sum, s) => sum + (s.duration || 0), 0) / 3600;
+      },
+      
+      // Get job by ID
+      getJob(jobId) {
+        return this.jobsCache.find(j => j.id === jobId);
+      },
+      
+      // Get current week range
+      getCurrentWeekRange() {
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0 = Sunday
+        const start = new Date(now);
+        start.setDate(now.getDate() - dayOfWeek);
+        start.setHours(0, 0, 0, 0);
+        
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        
+        return { start, end };
+      }
+    };
+    
+    // ============================================
+    // DATA SERVICE - Clean API for fetching data
+    // ============================================
+    const StatsService = {
+      // Normalize session data from various sources
+      normalizeSession(session) {
+        if (!session) return null;
+        
+        // Handle both Firestore and normalized formats
+        const duration = session.duration_seconds || session.durationSeconds || session.duration || 0;
+        const date = session.date || (session.startTime ? session.startTime.split('T')[0] : null);
+        
+        return {
+          id: session.id,
+          jobId: session.job_id || session.jobId,
+          date: date,
+          duration: Number(duration),
+          earnings: Number(session.earnings || 0),
+          startTime: session.start_time || session.startTime,
+          endTime: session.end_time || session.endTime,
+          note: session.note || ''
+        };
+      },
+      
+      // Fetch all sessions
+      async fetchAllSessions() {
+        try {
+          const sessions = await dbService.getSessions();
+          return sessions.map(s => this.normalizeSession(s)).filter(Boolean);
+        } catch (error) {
+          console.error('[StatsService] Error fetching sessions:', error);
+          return [];
+        }
+      },
+      
+      // Fetch all jobs
+      async fetchAllJobs() {
+        try {
+          return await dbService.getJobs(true);
+        } catch (error) {
+          console.error('[StatsService] Error fetching jobs:', error);
+          return [];
+        }
+      }
+    };
+    
+    // Comparisons for motivational messages
+    const comparisons = [
+      { threshold: 10, message: "That's like watching 5 movies!", icon: "film" },
+      { threshold: 20, message: "You've worked a full day more than most!", icon: "award" },
+      { threshold: 30, message: "That's a whole work week!", icon: "trophy" },
+      { threshold: 40, message: "You're on fire! Keep it up!", icon: "flame" }
+    ];
+    
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    async function initCalendar() {
+      console.log('[Calendar] Initializing...');
+      
+      try {
+        updateMonthDisplay();
+        lucide.createIcons();
+        
+        await dbService.waitForAuth();
+        console.log('[Calendar] Auth ready');
+        
+        // Load all data
+        await refreshAllData();
+        
+        console.log('[Calendar] Initialization complete');
+      } catch (error) {
+        console.error('[Calendar] Initialization failed:', error);
+        showError('Failed to load stats. Please try again.');
+      }
+    }
+    
+    function showError(message) {
+      const container = document.querySelector('main');
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center py-20 px-4">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+              <i data-lucide="alert-circle" class="w-8 h-8 text-red-400"></i>
+            </div>
+            <p class="text-white/70 mb-4">${message}</p>
+            <button onclick="location.reload()" class="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+              Retry
+            </button>
+          </div>
+        `;
+        lucide.createIcons();
+      }
+    }
+    
+    async function refreshAllData() {
+      if (StatsState.isLoading) return;
+      StatsState.isLoading = true;
+      
+      try {
+        console.log('[Calendar] Refreshing data...');
+        
+        // Load all sessions and jobs in parallel
+        const [sessions, jobs] = await Promise.all([
+          StatsService.fetchAllSessions(),
+          StatsService.fetchAllJobs()
+        ]);
+        
+        StatsState.sessionsCache = sessions;
+        StatsState.jobsCache = jobs;
+        
+        console.log('[Calendar] Loaded:', sessions.length, 'sessions,', jobs.length, 'jobs');
+        
+        // Update all UI components sequentially for better mobile performance
+        await loadWeeklySummary();
+        await renderHeatmap();
+        await loadPersonalRecords();
+        await loadEarningsProjection();
+        
+      } catch (error) {
+        console.error('[Calendar] Error refreshing data:', error);
+        // Show error but don't block UI
+      } finally {
+        StatsState.isLoading = false;
+      }
+    }
+    
+    // Update month display
+    function updateMonthDisplay() {
+      const monthEl = document.getElementById('currentMonth');
+      if (monthEl) {
+        monthEl.textContent = StatsState.currentDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      }
+    }
+    
+    // Change month
+    function changeMonth(direction) {
+      console.log('[Calendar] changeMonth:', direction);
+      StatsState.currentDate.setMonth(StatsState.currentDate.getMonth() + direction);
+      updateMonthDisplay();
+      renderHeatmap();
+    }
+    
+    // Change year
+    function changeYear(direction) {
+      console.log('[Calendar] changeYear:', direction);
+      StatsState.currentDate.setFullYear(StatsState.currentDate.getFullYear() + direction);
+      updateMonthDisplay();
+      renderHeatmap();
+    }
+    
+    // Close day modal
+    function closeDayModal() {
+      const modal = document.getElementById('dayModal');
+      if (modal) {
+        modal.classList.remove('open');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+      }
+    }
+    
+    // ============================================
+    // DAY DETAIL MODAL
+    // ============================================
+    async function showDayDetail(dateStr, hours) {
+      const modal = document.getElementById('dayModal');
+      const title = document.getElementById('dayModalTitle');
+      const totalEl = document.getElementById('dayModalTotal');
+      const content = document.getElementById('dayModalContent');
+      
+      const date = new Date(dateStr + 'T00:00:00');
+      title.textContent = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      totalEl.textContent = `${hours.toFixed(1)} hours total`;
+      
+      const daySessions = StatsState.getSessionsForDay(dateStr);
+      
+      if (daySessions.length === 0) {
+        content.innerHTML = `
+          <div class="text-center py-8">
+            <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+              <i data-lucide="coffee" class="w-8 h-8 text-white/30"></i>
+            </div>
+            <p class="text-white/50">No sessions recorded</p>
+            <p class="text-white/30 text-sm mt-1">Take a break or start tracking!</p>
+          </div>
+        `;
+      } else {
+        content.innerHTML = daySessions.map(s => {
+          const job = StatsState.getJob(s.jobId);
+          const startTime = s.startTime ? 
+            new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+          const duration = formatDurationShort(s.duration);
+          return `
+            <div class="session-item">
+              <div class="session-icon" style="background: ${job?.color || 'gray'};">
+                <i data-lucide="${job?.icon || 'briefcase'}" class="w-5 h-5 text-white"></i>
+              </div>
+              <div class="flex-1">
+                <p class="font-medium">${job?.name || 'Unknown Job'}</p>
+                <p class="text-white/50 text-sm">${startTime} · ${duration}</p>
+              </div>
+              ${s.earnings ? `<p class="text-[#4ADE80] font-medium">+$${s.earnings.toFixed(2)}</p>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+      
+      modal.classList.remove('hidden');
+      requestAnimationFrame(() => modal.classList.add('open'));
+      lucide.createIcons();
+    }
+    
+    // ============================================
+    // HEATMAP RENDERING
+    // ============================================
+    async function renderHeatmap() {
+      const year = StatsState.currentDate.getFullYear();
+      const month = StatsState.currentDate.getMonth();
+      
+      // Calculate month boundaries
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
+      
+      // Format for comparison (YYYY-MM-DD)
+      const startStr = formatDateLocal(monthStart);
+      const endStr = formatDateLocal(monthEnd);
+      
+      console.log('[Calendar] Rendering heatmap for:', startStr, 'to', endStr);
+      
+      // Get sessions for this month
+      const monthSessions = StatsState.getSessionsForRange(startStr, endStr);
+      console.log('[Calendar] Month sessions:', monthSessions.length);
+      
+      // Aggregate hours by date
+      const hoursByDate = {};
+      monthSessions.forEach(s => {
+        if (!hoursByDate[s.date]) hoursByDate[s.date] = 0;
+        hoursByDate[s.date] += (s.duration || 0) / 3600;
+      });
+      
+      // Build calendar grid
+      const firstDayOfWeek = monthStart.getDay(); // 0 = Sunday
+      const daysInMonth = monthEnd.getDate();
+      const today = formatDateLocal(new Date());
+      
+      const grid = document.getElementById('heatmapGrid');
+      if (!grid) {
+        console.error('[Calendar] Heatmap grid element not found');
+        return;
+      }
+      
+      let html = '';
+      let cellIndex = 0;
+      
+      // Empty cells for days before the 1st
+      for (let i = 0; i < firstDayOfWeek; i++) {
+        html += '<div></div>';
+        cellIndex++;
+      }
+      
+      // Day cells
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const hours = hoursByDate[dateStr] || 0;
+        const intensity = getHeatmapIntensity(hours);
+        const isToday = dateStr === today;
+        const hasData = hours > 0;
+        
+        // Use touch-friendly minimum sizes for mobile
+        html += `
+          <button class="heatmap-cell ${isToday ? 'today' : ''}" 
+               style="background: ${getHeatmapColor(intensity)}; border: none;"
+               onclick="window.showDayDetail('${dateStr}', ${hours})"
+               aria-label="${formatDisplayDate(dateStr)}: ${hours.toFixed(1)} hours">
+            <span style="${hasData ? 'font-weight: 600;' : 'opacity: 0.5;'}">${day}</span>
+          </button>
+        `;
+        cellIndex++;
+      }
+      
+      grid.innerHTML = html;
+    }
+    
+    // Format date to YYYY-MM-DD in local timezone
+    function formatDateLocal(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Format date for display
+    function formatDisplayDate(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    
+    // Get heatmap intensity
+    function getHeatmapIntensity(hours) {
+      if (hours === 0) return 0;
+      if (hours < 2) return 1;
+      if (hours < 4) return 2;
+      if (hours < 6) return 3;
+      if (hours < 8) return 4;
+      return 5;
+    }
+    
+    // Get heatmap color
+    function getHeatmapColor(intensity) {
+      const colors = [
+        'rgba(255, 255, 255, 0.05)',
+        'rgba(255, 154, 86, 0.25)',
+        'rgba(255, 154, 86, 0.45)',
+        'rgba(255, 154, 86, 0.65)',
+        'rgba(255, 154, 86, 0.85)',
+        '#FF9A56'
+      ];
+      return colors[intensity];
+    }
+    
+    // ============================================
+    // WEEKLY SUMMARY
+    // ============================================
+    async function loadWeeklySummary() {
+      const { start: weekStart, end: weekEnd } = StatsState.getCurrentWeekRange();
+      const startStr = formatDateLocal(weekStart);
+      const endStr = formatDateLocal(weekEnd);
+      
+      console.log('[Calendar] Weekly range:', startStr, 'to', endStr);
+      
+      // Get sessions for current week
+      const weekSessions = StatsState.getSessionsForRange(startStr, endStr);
+      console.log('[Calendar] Week sessions:', weekSessions.length);
+      
+      // Calculate totals
+      const totalSeconds = weekSessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+      const totalHours = (totalSeconds / 3600).toFixed(1);
+      const totalEarnings = weekSessions.reduce((sum, s) => sum + (s.earnings || 0), 0);
+      
+      // Update UI
+      document.getElementById('weekHours').textContent = totalHours;
+      document.getElementById('weekSessions').textContent = weekSessions.length;
+      document.getElementById('weekEarnings').textContent = `$${totalEarnings.toFixed(0)}`;
+      
+      // Load comparison and bars
+      await loadWeeklyComparison(totalSeconds);
+      await renderWeeklyBars(weekStart);
+      
+      // Update motivational message
+      updateMotivationalMessage(parseFloat(totalHours));
+    }
+    
+    function updateMotivationalMessage(totalHours) {
+      const messageEl = document.getElementById('motivationalMessage');
+      const comparison = comparisons.find(c => totalHours >= c.threshold);
+      
+      if (comparison) {
+        messageEl.innerHTML = `You worked ${totalHours} hours this week! ${comparison.message} <i data-lucide="${comparison.icon}" class="w-4 h-4 inline-block ml-1"></i>`;
+      } else if (totalHours > 0) {
+        messageEl.innerHTML = `Great start! ${totalHours} hours logged this week. <i data-lucide="thumbs-up" class="w-4 h-4 inline-block ml-1"></i>`;
+      } else {
+        messageEl.innerHTML = 'Ready to start your week? You\'ve got this! <i data-lucide="zap" class="w-4 h-4 inline-block ml-1"></i>';
+      }
+      lucide.createIcons();
+    }
+    
+    // ============================================
+    // WEEKLY COMPARISON & BARS
+    // ============================================
+    async function loadWeeklyComparison(currentWeekSeconds) {
+      const { start: currentWeekStart } = StatsState.getCurrentWeekRange();
+      
+      // Calculate last week range
+      const lastWeekStart = new Date(currentWeekStart);
+      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+      const lastWeekEnd = new Date(currentWeekStart);
+      
+      const lastWeekSessions = StatsState.sessionsCache.filter(s => {
+        const date = new Date(s.date);
+        return date >= lastWeekStart && date < lastWeekEnd;
+      });
+      
+      const lastWeekSeconds = lastWeekSessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+      const comparisonEl = document.getElementById('weeklyComparison');
+      
+      if (lastWeekSeconds === 0) {
+        comparisonEl.innerHTML = '<span class="text-white/40">No data from last week</span>';
+        return;
+      }
+      
+      const diff = currentWeekSeconds - lastWeekSeconds;
+      const percentChange = lastWeekSeconds > 0 ? Math.round((diff / lastWeekSeconds) * 100) : 0;
+      
+      if (diff > 0) {
+        comparisonEl.innerHTML = `<i data-lucide="trending-up" class="w-4 h-4 text-[#4ADE80]"></i><span class="text-[#4ADE80]">+${percentChange}% vs last week</span>`;
+      } else if (diff < 0) {
+        comparisonEl.innerHTML = `<i data-lucide="trending-down" class="w-4 h-4 text-[#F87171]"></i><span class="text-[#F87171]">${percentChange}% vs last week</span>`;
+      } else {
+        comparisonEl.innerHTML = `<i data-lucide="minus" class="w-4 h-4 text-white/50"></i><span class="text-white/50">Same as last week</span>`;
+      }
+      lucide.createIcons();
+    }
+    
+    async function renderWeeklyBars(weekStart) {
+      const barsContainer = document.getElementById('weeklyBars');
+      const dayHours = [];
+      let maxHours = 0;
+      
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(dayDate.getDate() + i);
+        const dateStr = formatDateLocal(dayDate);
+        const hours = StatsState.getHoursForDate(dateStr);
+        dayHours.push(hours);
+        maxHours = Math.max(maxHours, hours);
+      }
+      
+      const scaleFactor = maxHours > 0 ? 100 / maxHours : 0;
+      const today = new Date().getDay();
+      
+      barsContainer.innerHTML = dayHours.map((hours, i) => {
+        const height = maxHours > 0 ? Math.max((hours / maxHours) * 100, 4) : 4;
+        const isToday = i === today;
+        return `
+          <div class="flex flex-col items-center flex-1">
+            <div class="week-bar w-full relative" style="height: 60px;">
+              <div class="week-bar-fill absolute bottom-0 left-0 right-0" 
+                   style="height: ${height}%; ${isToday ? 'box-shadow: 0 0 10px rgba(255, 154, 86, 0.5);' : ''}"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+
+    
+    // ============================================
+    // PERSONAL RECORDS
+    // ============================================
+    async function loadPersonalRecords() {
+      const sessions = StatsState.sessionsCache;
+      
+      if (sessions.length === 0) {
+        document.getElementById('longestSession').textContent = 'No sessions yet';
+        document.getElementById('mostProductiveDay').textContent = '--';
+        document.getElementById('currentStreak').textContent = '0 days';
+        document.getElementById('bestEarningWeek').textContent = '--';
+        return;
+      }
+      
+      // Longest session
+      const longest = sessions.reduce((max, s) => (s.duration || 0) > (max.duration || 0) ? s : max, sessions[0]);
+      document.getElementById('longestSession').textContent = formatDurationShort(longest?.duration || 0);
+      
+      // Most productive day
+      const hoursByDay = {};
+      sessions.forEach(s => {
+        if (!s.date) return;
+        if (!hoursByDay[s.date]) hoursByDay[s.date] = 0;
+        hoursByDay[s.date] += (s.duration || 0) / 3600;
+      });
+      
+      const sortedDays = Object.entries(hoursByDay).sort((a, b) => b[1] - a[1]);
+      if (sortedDays.length > 0) {
+        const [dateStr, hours] = sortedDays[0];
+        const date = new Date(dateStr + 'T00:00:00');
+        document.getElementById('mostProductiveDay').textContent = 
+          `${hours.toFixed(1)}h (${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      
+      // Current streak
+      const streak = calculateStreak(sessions);
+      document.getElementById('currentStreak').textContent = `${streak} day${streak !== 1 ? 's' : ''}`;
+      
+      // Best earning week
+      const earningsByWeek = {};
+      sessions.forEach(s => {
+        if (!s.date) return;
+        const sessionDate = new Date(s.date + 'T00:00:00');
+        const weekStart = getWeekStart(sessionDate);
+        const weekKey = formatDateLocal(weekStart);
+        if (!earningsByWeek[weekKey]) earningsByWeek[weekKey] = 0;
+        earningsByWeek[weekKey] += s.earnings || 0;
+      });
+      
+      const sortedWeeks = Object.entries(earningsByWeek).sort((a, b) => b[1] - a[1]);
+      if (sortedWeeks.length > 0 && sortedWeeks[0][1] > 0) {
+        document.getElementById('bestEarningWeek').textContent = `$${sortedWeeks[0][1].toFixed(0)}`;
+      } else {
+        document.getElementById('bestEarningWeek').textContent = '--';
+      }
+    }
+    
+    // Calculate streak - consecutive days with sessions
+    function calculateStreak(sessions) {
+      const uniqueDays = [...new Set(sessions.map(s => s.date).filter(Boolean))].sort().reverse();
+      if (uniqueDays.length === 0) return 0;
+      
+      const today = formatDateLocal(new Date());
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterday = formatDateLocal(yesterdayDate);
+      
+      // Check if streak is still active (last session today or yesterday)
+      if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) {
+        return 0;
+      }
+      
+      let streak = 1;
+      for (let i = 1; i < uniqueDays.length; i++) {
+        const prevDate = new Date(uniqueDays[i - 1] + 'T00:00:00');
+        const currDate = new Date(uniqueDays[i] + 'T00:00:00');
+        const diffDays = Math.round((prevDate - currDate) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+      return streak;
+    }
+    
+    // ============================================
+    // EARNINGS PROJECTION
+    // ============================================
+    async function loadEarningsProjection() {
+      const sessions = StatsState.sessionsCache;
+      const hasRates = sessions.some(s => s.earnings > 0);
+      
+      if (!hasRates) return;
+      
+      document.getElementById('earningsProjection').classList.remove('hidden');
+      
+      const now = new Date();
+      const yearMonth = formatDateLocal(now).slice(0, 7); // YYYY-MM
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const daysPassed = now.getDate();
+      
+      const monthEarnings = sessions
+        .filter(s => s.date && s.date.startsWith(yearMonth))
+        .reduce((sum, s) => sum + (s.earnings || 0), 0);
+      
+      const dailyAverage = daysPassed > 0 ? monthEarnings / daysPassed : 0;
+      const projectedTotal = dailyAverage * daysInMonth;
+      
+      document.getElementById('projectedEarnings').textContent = `$${projectedTotal.toFixed(0)}`;
+    }
+    
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+    function formatDurationShort(seconds) {
+      const totalSeconds = Number(seconds) || 0;
+      const hrs = Math.floor(totalSeconds / 3600);
+      const mins = Math.floor((totalSeconds % 3600) / 60);
+      if (hrs > 0) return `${hrs}h ${mins}m`;
+      return `${mins}m`;
+    }
+    
+    function getWeekStart(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day;
+      return new Date(d.setDate(diff));
+    }
+    
+    // ============================================
+    // Expose functions to window for onclick handlers
+    // ============================================
+    window.changeMonth = changeMonth;
+    window.changeYear = changeYear;
+    window.closeDayModal = closeDayModal;
+    window.showDayDetail = showDayDetail;
+    
+    // ============================================
+    // Initialize on load
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      initCalendar().catch(err => {
+        console.error('[Calendar] Initialization error:', err);
+      });
+    });
+    
+    // Listen for DB changes to refresh data in real-time
+    window.addEventListener('db-change', (event) => {
+      const { table } = event.detail;
+      if (table === 'sessions') {
+        console.log('[Calendar] Sessions changed, refreshing...');
+        refreshAllData();
+      } else if (table === 'jobs') {
+        console.log('[Calendar] Jobs changed, refreshing...');
+        refreshAllData();
+      }
+    });
+    
+    // Listen for cross-tab updates
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'everwork_last_session_update') {
+        console.log('[Calendar] Cross-tab session update detected');
+        refreshAllData();
+      }
+    });
+    
+    // Close modal on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeDayModal();
+    });
+  </script>
+</body>
+</html>

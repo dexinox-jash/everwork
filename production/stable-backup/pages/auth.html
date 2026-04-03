@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0F0F13">
+  <title>Welcome | Ever Work</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Unregister old service worker if causing issues -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('[SW] Unregistered old service worker');
+        }
+        // Clear caches
+        if ('caches' in window) {
+          caches.keys().then(function(cacheNames) {
+            cacheNames.forEach(function(cacheName) {
+              caches.delete(cacheName);
+              console.log('[SW] Deleted cache:', cacheName);
+            });
+          });
+        }
+      });
+    }
+  </script>
+  
+  <style>
+    :root {
+      --primary-start: #FF9A56;
+      --primary-end: #FF6B6B;
+      --bg-primary: #0F0F13;
+      --bg-secondary: #1A1A1F;
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.7);
+      --text-muted: rgba(255, 255, 255, 0.5);
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+    
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+    }
+    
+    .bg-gradient-orb {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,154,86,0.15) 0%, transparent 70%);
+      transform: translate(-50%, -50%);
+      animation: pulse 8s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+      50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+    }
+    
+    .input-field {
+      width: 100%;
+      padding: 16px 20px;
+      border-radius: 16px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: white;
+      font-size: 16px;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    
+    .input-field:focus {
+      border-color: rgba(255, 154, 86, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 0 3px rgba(255, 154, 86, 0.1);
+    }
+    
+    .input-field::placeholder { color: var(--text-muted); }
+    
+    .input-wrapper { position: relative; }
+    
+    .input-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    
+    .input-field.with-icon { padding-left: 52px; }
+    
+    .btn-primary {
+      width: 100%;
+      padding: 18px 24px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%);
+      border: none;
+      color: white;
+      font-size: 17px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+    }
+    
+    .btn-primary:active:not(:disabled) { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .btn-secondary {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 16px;
+      background: transparent;
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      font-size: 16px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-secondary:hover {
+      background: var(--glass-bg);
+      color: white;
+    }
+    
+    /* Google Sign-In Button */
+    .btn-google {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 16px;
+      background: white;
+      border: none;
+      color: #3c4043;
+      font-size: 16px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    
+    .btn-google:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-google:active:not(:disabled) { transform: translateY(0); }
+    .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .google-logo {
+      width: 20px;
+      height: 20px;
+    }
+    
+    .auth-toggle {
+      display: flex;
+      background: var(--glass-bg);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 32px;
+    }
+    
+    .auth-toggle-btn {
+      flex: 1;
+      padding: 12px 24px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-radius: 10px;
+    }
+    
+    .auth-toggle-btn.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+    
+    .error-message {
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(248, 113, 113, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: #F87171;
+      font-size: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: shake 0.4s ease;
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    
+    .success-message {
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(74, 222, 128, 0.15);
+      border: 1px solid rgba(74, 222, 128, 0.3);
+      color: #4ADE80;
+      font-size: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Mobile optimizations */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    @media (max-width: 640px) {
+      html { font-size: 15px; }
+    }
+    
+    body {
+      padding: 20px;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .floating-icon {
+      position: absolute;
+      opacity: 0.1;
+      animation: float 6s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-20px) rotate(10deg); }
+    }
+    
+    .form-section { animation: slideUp 0.4s ease; }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .password-strength {
+      height: 4px;
+      border-radius: 2px;
+      margin-top: 8px;
+      transition: all 0.3s ease;
+    }
+    
+    .strength-weak { background: #F87171; width: 33%; }
+    .strength-medium { background: #FBBF24; width: 66%; }
+    .strength-strong { background: #4ADE80; width: 100%; }
+    
+    /* Ensure hidden class works */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen px-5 py-10">
+  
+  <div class="bg-gradient-orb"></div>
+  
+  <i data-lucide="clock" class="floating-icon w-16 h-16 top-20 left-10" style="animation-delay: 0s;"></i>
+  <i data-lucide="briefcase" class="floating-icon w-12 h-12 top-40 right-10" style="animation-delay: 1s;"></i>
+  <i data-lucide="calendar" class="floating-icon w-14 h-14 bottom-40 left-16" style="animation-delay: 2s;"></i>
+  <i data-lucide="zap" class="floating-icon w-10 h-10 bottom-20 right-20" style="animation-delay: 3s;"></i>
+  
+  <div class="relative z-10 w-full max-w-md">
+    
+    <div class="text-center mb-8">
+      <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#FF9A56] to-[#FF6B6B] flex items-center justify-center shadow-2xl shadow-[#FF6B6B]/30">
+        <i data-lucide="clock" class="w-10 h-10 text-white"></i>
+      </div>
+      
+      <h1 class="text-3xl font-bold mb-2">Ever Work</h1>
+      <p class="text-white/50 text-base">Track your hustle. Celebrate your grind.</p>
+    </div>
+    
+    <div class="auth-toggle">
+      <button class="auth-toggle-btn active" data-mode="login" onclick="switchMode('login')">Sign In</button>
+      <button class="auth-toggle-btn" data-mode="signup" onclick="switchMode('signup')">Sign Up</button>
+    </div>
+    
+    <div id="messageContainer"></div>
+    
+    <!-- Login Form -->
+    <form id="loginForm" class="form-section space-y-4">
+      <div class="input-wrapper">
+        <i data-lucide="mail" class="input-icon w-5 h-5"></i>
+        <input type="email" id="loginEmail" class="input-field with-icon" placeholder="Email address" required autocomplete="email">
+      </div>
+      
+      <div class="input-wrapper">
+        <i data-lucide="lock" class="input-icon w-5 h-5"></i>
+        <input type="password" id="loginPassword" class="input-field with-icon" placeholder="Password" required autocomplete="current-password">
+      </div>
+      
+      <div class="flex justify-end">
+        <button type="button" onclick="showForgotPassword()" class="text-sm text-[#FF9A56] hover:underline">Forgot password?</button>
+      </div>
+      
+      <button type="submit" class="btn-primary" id="loginBtn">
+        <span>Sign In</span>
+        <i data-lucide="arrow-right" class="w-5 h-5"></i>
+      </button>
+    </form>
+    
+    <!-- Signup Form -->
+    <form id="signupForm" class="form-section space-y-4 hidden">
+      <div class="input-wrapper">
+        <i data-lucide="user" class="input-icon w-5 h-5"></i>
+        <input type="text" id="signupName" class="input-field with-icon" placeholder="Your name" required autocomplete="name">
+      </div>
+      
+      <div class="input-wrapper">
+        <i data-lucide="mail" class="input-icon w-5 h-5"></i>
+        <input type="email" id="signupEmail" class="input-field with-icon" placeholder="Email address" required autocomplete="email">
+      </div>
+      
+      <div class="input-wrapper">
+        <i data-lucide="lock" class="input-icon w-5 h-5"></i>
+        <input type="password" id="signupPassword" class="input-field with-icon" placeholder="Create password" required minlength="6" autocomplete="new-password" oninput="checkPasswordStrength(this.value)">
+      </div>
+      <div id="passwordStrength" class="password-strength hidden"></div>
+      
+      <div class="input-wrapper">
+        <i data-lucide="shield-check" class="input-icon w-5 h-5"></i>
+        <input type="password" id="signupConfirmPassword" class="input-field with-icon" placeholder="Confirm password" required autocomplete="new-password">
+      </div>
+      
+      <button type="submit" class="btn-primary" id="signupBtn">
+        <span>Create Account</span>
+        <i data-lucide="user-plus" class="w-5 h-5"></i>
+      </button>
+    </form>
+    
+    <!-- Google Sign In Button -->
+    <button onclick="signInWithGoogle()" class="btn-google" id="googleBtn">
+      <svg class="google-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      <span>Continue with Google</span>
+    </button>
+    
+    <div class="flex items-center gap-4 my-8">
+      <div class="flex-1 h-px bg-white/10"></div>
+      <span class="text-white/30 text-sm">or</span>
+      <div class="flex-1 h-px bg-white/10"></div>
+    </div>
+    
+    <button onclick="continueAsGuest()" class="btn-secondary">
+      <span>Continue as Guest (Local Only)</span>
+    </button>
+    
+    <p class="text-center text-white/40 text-sm mt-8">
+      By signing up, you agree to our<br>
+      <a href="#" class="text-[#FF9A56] hover:underline">Terms</a> & 
+      <a href="#" class="text-[#FF9A56] hover:underline">Privacy Policy</a>
+    </p>
+  </div>
+  
+  <script src="../shared/config.js"></script>
+  <script src="../shared/time-service.js"></script>
+  <script src="../shared/firebase-service.js"></script>
+  
+  <script>
+    try {
+    
+    lucide.createIcons();
+    
+    let currentMode = 'login';
+    
+    // Note: We don't auto-redirect here anymore
+    // The index.html handles the redirect logic
+    // This prevents redirect loops
+    
+    function switchMode(mode) {
+      currentMode = mode;
+      
+      document.querySelectorAll('.auth-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      
+      document.getElementById('loginForm').classList.toggle('hidden', mode !== 'login');
+      document.getElementById('signupForm').classList.toggle('hidden', mode !== 'signup');
+      
+      document.getElementById('messageContainer').innerHTML = '';
+      document.getElementById('loginForm').reset();
+      document.getElementById('signupForm').reset();
+      document.getElementById('passwordStrength').classList.add('hidden');
+    }
+    
+    function showMessage(message, type = 'error') {
+      const container = document.getElementById('messageContainer');
+      const div = document.createElement('div');
+      div.className = type === 'error' ? 'error-message' : 'success-message';
+      div.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle'}" class="w-5 h-5"></i><span>${message}</span>`;
+      container.innerHTML = '';
+      container.appendChild(div);
+      lucide.createIcons();
+    }
+    
+    function checkPasswordStrength(password) {
+      const strengthBar = document.getElementById('passwordStrength');
+      
+      if (password.length === 0) {
+        strengthBar.classList.add('hidden');
+        return;
+      }
+      
+      strengthBar.classList.remove('hidden');
+      strengthBar.className = 'password-strength';
+      
+      let strength = 0;
+      if (password.length >= 6) strength++;
+      if (password.length >= 10) strength++;
+      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+      if (/\d/.test(password)) strength++;
+      if (/[^a-zA-Z0-9]/.test(password)) strength++;
+      
+      if (strength <= 2) strengthBar.classList.add('strength-weak');
+      else if (strength <= 4) strengthBar.classList.add('strength-medium');
+      else strengthBar.classList.add('strength-strong');
+    }
+    
+    function setButtonLoading(buttonId, loading) {
+      const btn = document.getElementById(buttonId);
+      if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div>';
+      } else {
+        btn.disabled = false;
+        if (buttonId === 'loginBtn') {
+          btn.innerHTML = '<span>Sign In</span><i data-lucide="arrow-right" class="w-5 h-5"></i>';
+        } else {
+          btn.innerHTML = '<span>Create Account</span><i data-lucide="user-plus" class="w-5 h-5"></i>';
+        }
+        lucide.createIcons();
+      }
+    }
+    
+    // Login form submission
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      
+      setButtonLoading('loginBtn', true);
+      
+      const result = await dbService.signIn(email, password);
+      
+      if (result.success) {
+        window.location.href = '/pages/dashboard.html';
+      } else {
+        setButtonLoading('loginBtn', false);
+        showMessage(result.error);
+      }
+    });
+    
+    // Signup form submission
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('signupName').value;
+      const email = document.getElementById('signupEmail').value;
+      const password = document.getElementById('signupPassword').value;
+      const confirmPassword = document.getElementById('signupConfirmPassword').value;
+      
+      if (password !== confirmPassword) {
+        showMessage('Passwords do not match');
+        return;
+      }
+      
+      if (password.length < 6) {
+        showMessage('Password must be at least 6 characters');
+        return;
+      }
+      
+      setButtonLoading('signupBtn', true);
+      
+      const result = await dbService.signUp(email, password, name);
+      
+      if (result.success) {
+        showMessage('Account created successfully!', 'success');
+        setTimeout(() => {
+          window.location.href = '/pages/dashboard.html';
+        }, 1000);
+      } else {
+        setButtonLoading('signupBtn', false);
+        showMessage(result.error);
+      }
+    });
+    
+    function showForgotPassword() {
+      const email = document.getElementById('loginEmail').value;
+      
+      if (!email) {
+        showMessage('Please enter your email address');
+        document.getElementById('loginEmail').focus();
+        return;
+      }
+      
+      firebase.auth().sendPasswordResetEmail(email)
+        .then(() => {
+          showMessage('Password reset email sent! Check your inbox.', 'success');
+        })
+        .catch((error) => {
+          showMessage(error.message);
+        });
+    }
+    
+    function continueAsGuest() {
+      localStorage.setItem('everwork_guest_mode', 'true');
+      localStorage.setItem('everwork_offline_mode', 'true');
+      const guestId = 'guest_' + Date.now();
+      localStorage.setItem('everwork_guest_id', guestId);
+      window.location.href = '/pages/dashboard.html';
+    }
+    
+    // Google Sign In
+    async function signInWithGoogle() {
+      const btn = document.getElementById('googleBtn');
+      const originalContent = btn.innerHTML;
+      
+      // Show loading state
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div><span>Connecting...</span>';
+      
+      try {
+        const result = await dbService.signInWithGoogle();
+        
+        if (result.success) {
+          window.location.href = '/pages/dashboard.html';
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = originalContent;
+          showMessage(result.error || 'Google sign in failed');
+        }
+      } catch (error) {
+        console.error('Google sign in error:', error);
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+        showMessage('Failed to sign in with Google');
+      }
+    }
+    
+    // Expose functions to window scope for HTML onclick handlers
+    window.switchMode = switchMode;
+    window.showMessage = showMessage;
+    window.checkPasswordStrength = checkPasswordStrength;
+    window.showForgotPassword = showForgotPassword;
+    window.continueAsGuest = continueAsGuest;
+    window.signInWithGoogle = signInWithGoogle;
+    
+    // Initialize form visibility on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Ensure only login form is visible by default
+      switchMode('login');
+    });
+    
+    } catch (err) {
+      console.error('[Auth] Script initialization error:', err);
+      alert('Error initializing auth page: ' + err.message);
+    }
+  </script>
+</body>
+</html>

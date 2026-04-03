@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0F0F13">
+  <title>Timer | Ever Work</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="../shared/animations.css">
+  
+  <!-- Shared Scripts -->
+  <script src="../shared/config.js"></script>
+  <script src="../shared/time-service.js"></script>
+  <script src="../shared/firebase-service.js"></script>
+  <script src="../shared/scripts.js"></script>
+  <script src="../shared/enhanced-interactions.js"></script>
+  
+  <style>
+    :root {
+      --bg-primary: #0F0F13;
+      --bg-secondary: #1A1A1F;
+      --bg-card: rgba(255, 255, 255, 0.03);
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.7);
+      --text-tertiary: rgba(255, 255, 255, 0.5);
+      --text-muted: rgba(255, 255, 255, 0.35);
+      --primary-start: #FF9A56;
+      --primary-end: #FF6B6B;
+      --gold: #FFD700;
+      --success: #4ADE80;
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+    
+    * { box-sizing: border-box; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Timer breathing animation */
+    .timer-breathing { animation: breathe 4s ease-in-out infinite; }
+    @keyframes breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    
+    /* Slide track */
+    .slide-track {
+      background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+      border-radius: 9999px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Progress fill */
+    .slide-fill {
+      background: linear-gradient(90deg, var(--primary-start) 0%, var(--primary-end) 100%);
+      border-radius: 9999px;
+      transition: width 0.1s linear;
+    }
+    
+    /* Thumb */
+    .slide-thumb {
+      background: linear-gradient(135deg, var(--primary-start) 0%, var(--primary-end) 100%);
+      border-radius: 50%;
+      box-shadow: 0 4px 20px rgba(255, 154, 86, 0.4);
+      cursor: grab;
+      transition: transform 0.2s ease;
+    }
+    
+    .slide-thumb:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+    
+    /* Arrow animation */
+    @keyframes arrowPulse {
+      0%, 100% { transform: translateX(0); opacity: 1; }
+      50% { transform: translateX(4px); opacity: 0.7; }
+    }
+    .arrow-pulse { animation: arrowPulse 1.5s ease-in-out infinite; }
+    
+    /* Glass card */
+    .glass-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+    }
+    
+    /* Note modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    
+    .modal-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .modal-content {
+      transform: scale(0.9) translateY(20px);
+      transition: transform 0.3s ease;
+    }
+    
+    .modal-overlay.open .modal-content {
+      transform: scale(1) translateY(0);
+    }
+    
+    /* Safe area for mobile */
+    .safe-area-bottom {
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    }
+    
+    /* Hide scrollbar */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="flex flex-col h-screen">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between px-5 py-4 safe-area-top">
+    <button onclick="window.navigateBack()" class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+      <i data-lucide="chevron-left" class="w-5 h-5"></i>
+    </button>
+    <h1 id="headerTitle" class="text-lg font-semibold">Start Timer</h1>
+    <button onclick="window.showNoteModal()" class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+      <i data-lucide="file-text" class="w-5 h-5"></i>
+    </button>
+  </header>
+
+  <!-- Start View - Shows when no timer is active -->
+  <div id="startView" class="hidden relative z-10 flex-1 flex flex-col items-center justify-center px-5">
+    <div class="text-center mb-8">
+      <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#FF9A56] to-[#FF6B6B] flex items-center justify-center">
+        <i data-lucide="play" class="w-10 h-10 text-white fill-white"></i>
+      </div>
+      <h2 class="text-2xl font-bold mb-2">Start Working</h2>
+      <p class="text-white/50">Select a job to begin tracking</p>
+    </div>
+    
+    <div id="jobList" class="w-full max-w-sm space-y-3 max-h-[60vh] overflow-y-auto">
+      <!-- Job buttons will be injected here -->
+    </div>
+    
+    <!-- Debug & Clear Buttons -->
+    <div class="mt-4 space-y-2">
+      <button onclick="window.debugJobData()" class="px-6 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-medium hover:bg-blue-500/30 transition-colors">
+        <i data-lucide="bug" class="w-4 h-4 inline-block mr-2"></i>
+        Debug Job Data
+      </button>
+      <button onclick="window.forceSyncJobs()" class="px-6 py-2 rounded-xl bg-green-500/20 text-green-400 text-sm font-medium hover:bg-green-500/30 transition-colors">
+        <i data-lucide="refresh-cw" class="w-4 h-4 inline-block mr-2"></i>
+        Sync Jobs
+      </button>
+      <button id="clearTimerBtn" onclick="window.clearStuckTimer()" class="hidden px-6 py-2 rounded-xl bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30 transition-colors">
+        <i data-lucide="alert-triangle" class="w-4 h-4 inline-block mr-2"></i>
+        Clear Stuck Timer
+      </button>
+    </div>
+    
+    <button onclick="window.location.href='/pages/dashboard.html'" class="mt-8 px-8 py-4 rounded-xl bg-white/10 text-white/70 font-medium hover:bg-white/15 transition-colors">
+      Back to Dashboard
+    </button>
+  </div>
+
+  <!-- Timer View - Shows when timer is active -->
+  <div id="timerView" class="hidden relative z-10 flex-1 flex flex-col">
+  
+  <main class="flex-1 flex flex-col items-center justify-center px-5">
+    
+    <!-- Job Info -->
+    <div class="flex items-center gap-4 mb-8">
+      <div id="jobIconContainer" class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background: linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)">
+        <i id="jobIcon" data-lucide="briefcase" class="w-7 h-7 text-white"></i>
+      </div>
+      <div>
+        <h2 id="jobName" class="text-xl font-semibold">Job Name</h2>
+        <p id="jobRate" class="text-white/50 text-sm">$0/hr</p>
+      </div>
+    </div>
+    
+    <!-- Timer Display -->
+    <div class="relative mb-12">
+      <!-- Background glow -->
+      <div class="absolute inset-0 bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] opacity-20 blur-3xl rounded-full scale-150"></div>
+      
+      <!-- Timer -->
+      <div id="timerDisplay" class="relative text-7xl font-mono font-semibold tracking-wider timer-breathing">
+        00:00:00
+      </div>
+    </div>
+    
+    <!-- Earnings -->
+    <div id="earningsContainer" class="flex items-center gap-2 mb-12 px-6 py-3 rounded-full bg-white/5">
+      <i data-lucide="dollar-sign" class="w-5 h-5 text-[#FFD700]"></i>
+      <span id="earningsDisplay" class="text-2xl font-semibold text-[#FFD700]">0.00</span>
+    </div>
+    
+    <!-- Slide to Stop -->
+    <div class="w-full max-w-sm">
+      <div id="slideTrack" class="slide-track h-16 relative select-none">
+        <!-- Fill -->
+        <div id="slideFill" class="slide-fill absolute left-0 top-0 h-full" style="width: 0%"></div>
+        
+        <!-- Text -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span class="text-white/50 font-medium flex items-center gap-2">
+            <i data-lucide="chevrons-right" class="w-5 h-5 arrow-pulse"></i>
+            Slide to stop
+          </span>
+        </div>
+        
+        <!-- Thumb -->
+        <div id="slideThumb" class="slide-thumb absolute top-1 left-1 w-14 h-14 flex items-center justify-center" style="transform: translateX(0)">
+          <i data-lucide="chevron-right" class="w-6 h-6 text-white"></i>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Note -->
+    <div id="noteDisplay" class="mt-8 text-center text-white/50 text-sm max-w-sm hidden">
+      <i data-lucide="file-text" class="w-4 h-4 inline-block mr-1"></i>
+      <span id="noteText"></span>
+    </div>
+    
+  </main>
+  
+  </div>
+
+  <!-- Note Modal -->
+  <div id="noteModal" class="modal-overlay" onclick="window.closeNoteModal()">
+    <div class="modal-content glass-card w-full max-w-sm mx-5 p-6" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold">Session Note</h3>
+        <button onclick="window.closeNoteModal()" class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <textarea id="noteInput" placeholder="Add a note about this session..." 
+                class="w-full h-32 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 resize-none focus:outline-none focus:border-[#FF9A56] transition-colors"></textarea>
+      <button onclick="window.saveNote()" class="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-medium hover:opacity-90 transition-opacity">
+        Save Note
+      </button>
+    </div>
+  </div>
+
+  <script>
+  // ============================================
+  // Timer Application Logic - COMPLETE REWRITE
+  // ============================================
+  
+  // ============================================
+  // TIMER STATE MANAGEMENT - CLEAN ARCHITECTURE
+  // ============================================
+  
+  // Core state - always use these getters/setters for consistency
+  const TimerState = {
+    session: null,
+    job: null,
+    animationFrame: null,
+    startTimestamp: null,  // Unix timestamp in milliseconds
+    note: '',
+    
+    // Getters
+    get isRunning() { return this.session !== null; },
+    get elapsedSeconds() { 
+      if (!this.startTimestamp) return 0;
+      return Math.floor((Date.now() - this.startTimestamp) / 1000);
+    },
+    
+    // Setters with validation
+    setSession(sessionData) {
+      if (!sessionData || !sessionData.startTime) {
+        console.error('[TimerState] Invalid session data');
+        return false;
+      }
+      this.session = sessionData;
+      // Parse startTime - handles ISO strings or Date objects
+      const start = new Date(sessionData.startTime);
+      if (isNaN(start.getTime())) {
+        console.error('[TimerState] Invalid startTime:', sessionData.startTime);
+        return false;
+      }
+      this.startTimestamp = start.getTime();
+      console.log('[TimerState] Session set, startTimestamp:', this.startTimestamp);
+      return true;
+    },
+    
+    clear() {
+      this.session = null;
+      this.job = null;
+      this.startTimestamp = null;
+      this.note = '';
+      if (this.animationFrame) {
+        cancelAnimationFrame(this.animationFrame);
+        this.animationFrame = null;
+      }
+    },
+    
+    // Save to localStorage with validation
+    persist() {
+      if (!this.session) {
+        localStorage.removeItem('activeTimer');
+        return;
+      }
+      const data = {
+        id: this.session.id,
+        jobId: this.session.jobId,
+        sessionId: this.session.sessionId,
+        startTime: this.session.startTime,
+        note: this.note,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem('activeTimer', JSON.stringify(data));
+    },
+    
+    // Load from localStorage with validation
+    load() {
+      try {
+        const data = localStorage.getItem('activeTimer');
+        if (!data) return null;
+        const parsed = JSON.parse(data);
+        // Validate required fields
+        if (!parsed.id || !parsed.jobId || !parsed.sessionId || !parsed.startTime) {
+          console.warn('[TimerState] Invalid stored data, clearing');
+          localStorage.removeItem('activeTimer');
+          return null;
+        }
+        return parsed;
+      } catch (e) {
+        console.error('[TimerState] Failed to load:', e);
+        localStorage.removeItem('activeTimer');
+        return null;
+      }
+    }
+  };
+  
+  // Legacy aliases for backward compatibility
+  let activeSession = null;
+  let currentJob = null;
+  let animationFrame = null;
+  let startTime = null;
+  let note = '';
+  
+  // Initialize
+  async function init() {
+    try {
+      console.log('[Timer] Initializing...');
+      
+      // Wait for auth
+      await dbService.waitForAuth(10000);
+      console.log('[Timer] Auth ready');
+      
+      // Check for active timer
+      await checkForActiveTimer();
+      
+    } catch (err) {
+      console.error('[Timer] Init error:', err);
+      showError('Failed to initialize timer');
+    }
+  }
+  
+  // ============================================
+  // TIMER CHECK & RECOVERY
+  // ============================================
+  
+  async function checkForActiveTimer() {
+    console.log('[Timer] Checking for active timer...');
+    
+    // Always check Firebase first (source of truth)
+    const firebaseTimer = await dbService.getActiveTimer();
+    console.log('[Timer] Firebase timer:', firebaseTimer ? 'exists' : 'none');
+    
+    if (firebaseTimer) {
+      await handleFirebaseTimerFound(firebaseTimer);
+      return;
+    }
+    
+    // No Firebase timer - check for orphaned local data
+    const localTimer = TimerState.load();
+    if (localTimer) {
+      console.log('[Timer] Orphaned local timer found, clearing');
+      localStorage.removeItem('activeTimer');
+    }
+    
+    showJobSelector();
+  }
+  
+  async function handleFirebaseTimerFound(firebaseTimer) {
+    console.log('[Timer] Processing Firebase timer:', firebaseTimer.id);
+    
+    // Validate timer data
+    const startTimeStr = firebaseTimer.serverStartTime || firebaseTimer.clientStartTime;
+    if (!startTimeStr) {
+      console.error('[Timer] Timer missing start time, clearing');
+      await clearOrphanedTimer(firebaseTimer.id);
+      showJobSelector();
+      return;
+    }
+    
+    // Check for stale timer (> 24 hours)
+    const startTime = new Date(startTimeStr);
+    const hoursElapsed = (Date.now() - startTime.getTime()) / (1000 * 60 * 60);
+    
+    if (hoursElapsed > 24) {
+      console.warn('[Timer] Stale timer detected (>24h), clearing');
+      await clearOrphanedTimer(firebaseTimer.id, firebaseTimer.sessionId);
+      showToast('Old timer was cleared', 'warning');
+      showJobSelector();
+      return;
+    }
+    
+    // Sync to localStorage
+    localStorage.setItem('activeTimer', JSON.stringify({
+      id: firebaseTimer.id,
+      jobId: firebaseTimer.jobId,
+      sessionId: firebaseTimer.sessionId,
+      startTime: startTimeStr,
+      note: firebaseTimer.note || ''
+    }));
+    
+    await loadTimer(firebaseTimer);
+  }
+  
+  async function clearOrphanedTimer(timerId, sessionId = null) {
+    try {
+      // Try to stop properly if we have sessionId
+      if (sessionId) {
+        await dbService.stopTimer(timerId, sessionId).catch(() => {});
+      } else {
+        // Just delete the timer document
+        await dbService.db.collection('users').doc(dbService.currentUser.uid)
+          .collection('activeTimers').doc(timerId).delete().catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[Timer] Could not clear orphaned timer:', e);
+    }
+    localStorage.removeItem('activeTimer');
+  }
+  
+  // ============================================
+  // LOAD TIMER WITH VALIDATION
+  // ============================================
+  
+  async function loadTimer(timerData) {
+    console.log('[Timer] Loading timer:', timerData.id);
+    
+    const jobId = timerData.jobId;
+    if (!jobId) {
+      console.error('[Timer] No jobId in timer');
+      showJobSelector();
+      return;
+    }
+    
+    // Extract and validate start time
+    const startTimeStr = timerData.serverStartTime || timerData.clientStartTime || timerData.startTime;
+    if (!startTimeStr) {
+      console.error('[Timer] Timer missing start time');
+      await clearOrphanedTimer(timerData.id, timerData.sessionId);
+      showJobSelector();
+      return;
+    }
+    
+    // Fetch job
+    currentJob = await fetchJob(jobId);
+    if (!currentJob) {
+      currentJob = {
+        id: jobId,
+        name: 'Unknown Job',
+        icon: 'briefcase',
+        color: 'linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)',
+        hourlyRate: null
+      };
+    }
+    
+    // Set up session data
+    const sessionData = {
+      id: timerData.id,
+      jobId: jobId,
+      sessionId: timerData.sessionId,
+      startTime: startTimeStr,
+      note: timerData.note || ''
+    };
+    
+    // Validate and set in TimerState
+    if (!TimerState.setSession(sessionData)) {
+      console.error('[Timer] Failed to set session');
+      showJobSelector();
+      return;
+    }
+    
+    TimerState.job = currentJob;
+    TimerState.note = sessionData.note;
+    
+    // Sync legacy variables
+    syncLegacyState();
+    
+    showTimerUI();
+    startTimerAnimation();
+  }
+  
+  function syncLegacyState() {
+    activeSession = TimerState.session;
+    currentJob = TimerState.job;
+    note = TimerState.note;
+    startTime = TimerState.startTimestamp ? new Date(TimerState.startTimestamp) : null;
+  }
+  
+  // Fetch job by ID with multiple fallback strategies
+  async function fetchJob(jobId) {
+    console.log('[Timer] fetchJob called with:', jobId);
+    
+    // Strategy 1: Check the cached jobs from localStorage (freshest from showJobSelector)
+    try {
+      const cachedJobs = JSON.parse(localStorage.getItem('everwork_jobs') || '[]');
+      console.log('[Timer] Checking cached jobs:', cachedJobs.length);
+      const cachedJob = cachedJobs.find(j => j.id === jobId || j.id == jobId);
+      if (cachedJob) {
+        console.log('[Timer] Job found in cache:', cachedJob.name);
+        return cachedJob;
+      }
+    } catch (e) {
+      console.warn('[Timer] Cache check failed:', e);
+    }
+    
+    // Strategy 2: Direct Firebase fetch
+    try {
+      const job = await dbService.getJobById(jobId);
+      if (job) {
+        console.log('[Timer] Job found via direct fetch:', job.name);
+        return job;
+      }
+    } catch (e) {
+      console.warn('[Timer] Direct fetch failed:', e);
+    }
+    
+    // Strategy 3: Fetch all jobs and search
+    try {
+      console.log('[Timer] Trying job list fetch...');
+      const jobs = await dbService.getJobs(true);
+      console.log('[Timer] Got', jobs.length, 'jobs');
+      
+      // Update cache
+      localStorage.setItem('everwork_jobs', JSON.stringify(jobs));
+      
+      const job = jobs.find(j => j.id === jobId || j.id == jobId);
+      if (job) {
+        console.log('[Timer] Job found in list:', job.name);
+        return job;
+      }
+    } catch (e) {
+      console.warn('[Timer] List fetch failed:', e);
+    }
+    
+    console.warn('[Timer] Job not found:', jobId);
+    return null;
+  }
+  
+  // ============================================
+  // UI UPDATES - Uses TimerState
+  // ============================================
+  
+  function showTimerUI() {
+    console.log('[Timer] Showing timer UI');
+    
+    const job = TimerState.job || currentJob;
+    const noteText = TimerState.note || note;
+    
+    document.getElementById('startView').classList.add('hidden');
+    document.getElementById('timerView').classList.remove('hidden');
+    document.getElementById('headerTitle').textContent = 'Currently Working';
+    
+    // Update job info
+    document.getElementById('jobName').textContent = job?.name || 'Unnamed Job';
+    document.getElementById('jobIcon').setAttribute('data-lucide', job?.icon || 'briefcase');
+    document.getElementById('jobIconContainer').style.background = job?.color || 'linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)';
+    
+    // Update rate display
+    if (job?.hourlyRate) {
+      document.getElementById('jobRate').textContent = `$${job.hourlyRate}/hr`;
+      document.getElementById('earningsContainer').style.display = 'flex';
+    } else {
+      document.getElementById('jobRate').style.display = 'none';
+      document.getElementById('earningsContainer').style.display = 'none';
+    }
+    
+    // Show note if exists
+    const noteDisplay = document.getElementById('noteDisplay');
+    if (noteText) {
+      noteDisplay.classList.remove('hidden');
+      document.getElementById('noteText').textContent = noteText;
+    } else {
+      noteDisplay.classList.add('hidden');
+    }
+    
+    lucide.createIcons();
+  }
+  
+  // ============================================
+  // TIMER ANIMATION - Uses TimerState for consistency
+  // ============================================
+  
+  function startTimerAnimation() {
+    const timerDisplay = document.getElementById('timerDisplay');
+    const earningsDisplay = document.getElementById('earningsDisplay');
+    
+    function update() {
+      const elapsed = TimerState.elapsedSeconds;
+      
+      // Update time display
+      timerDisplay.textContent = formatTime(elapsed);
+      
+      // Update earnings
+      if (TimerState.job && TimerState.job.hourlyRate) {
+        const earnings = (elapsed / 3600) * TimerState.job.hourlyRate;
+        earningsDisplay.textContent = earnings.toFixed(2);
+      }
+      
+      TimerState.animationFrame = requestAnimationFrame(update);
+      animationFrame = TimerState.animationFrame; // legacy sync
+    }
+    
+    update();
+  }
+  
+  // Show job selector
+  async function showJobSelector() {
+    console.log('[Timer] Showing job selector');
+    
+    document.getElementById('startView').classList.remove('hidden');
+    document.getElementById('timerView').classList.add('hidden');
+    document.getElementById('headerTitle').textContent = 'Start Timer';
+    
+    const jobList = document.getElementById('jobList');
+    const clearTimerBtn = document.getElementById('clearTimerBtn');
+    
+    // Show clear button if there's stale timer data
+    const savedTimer = localStorage.getItem('activeTimer');
+    if (savedTimer && clearTimerBtn) {
+      clearTimerBtn.classList.remove('hidden');
+    }
+    
+    // Loading state
+    jobList.innerHTML = `
+      <div class="text-center py-8">
+        <div class="w-8 h-8 border-2 border-white/20 border-t-[#FF9A56] rounded-full animate-spin mx-auto mb-4"></div>
+        <p class="text-white/50">Loading jobs...</p>
+      </div>
+    `;
+    
+    try {
+      await dbService.waitForAuth();
+      const jobs = await dbService.getJobs();
+      
+      // Cache jobs in localStorage for quick access
+      localStorage.setItem('everwork_jobs', JSON.stringify(jobs));
+      
+      if (jobs.length === 0) {
+        jobList.innerHTML = `
+          <div class="text-center py-8">
+            <p class="text-white/50 mb-4">No jobs yet</p>
+            <a href="/pages/jobs.html" class="inline-block px-6 py-3 rounded-xl bg-gradient-to-r from-[#FF9A56] to-[#FF6B6B] text-white font-medium">
+              Create Your First Job
+            </a>
+          </div>
+        `;
+      } else {
+        jobList.innerHTML = jobs.map(job => `
+          <button onclick="window.startTimerForJob('${job.id}')" 
+                  class="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background: ${job.color || 'linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%)'}">
+              <i data-lucide="${job.icon || 'briefcase'}" class="w-6 h-6 text-white"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-medium truncate">${job.name || 'Unnamed Job'}</p>
+              ${job.hourlyRate ? `<p class="text-white/50 text-sm">$${job.hourlyRate}/hr</p>` : ''}
+            </div>
+            <i data-lucide="play" class="w-5 h-5 text-[#FF9A56] fill-[#FF9A56]"></i>
+          </button>
+        `).join('');
+      }
+      
+      lucide.createIcons();
+    } catch (error) {
+      console.error('[Timer] Error loading jobs:', error);
+      jobList.innerHTML = `
+        <div class="text-center py-8 text-white/50">
+          <p>Error loading jobs</p>
+          <button onclick="window.showJobSelector()" class="mt-4 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+            Retry
+          </button>
+        </div>
+      `;
+    }
+  }
+  
+  // ============================================
+  // START TIMER - Clean slate approach
+  // ============================================
+  
+  async function startTimerForJob(jobId) {
+    console.group('[Timer] Starting timer for job:', jobId);
+    
+    try {
+      await dbService.waitForAuth();
+      
+      // STEP 1: Clear any existing timer state completely
+      TimerState.clear();
+      localStorage.removeItem('activeTimer');
+      
+      // Legacy cleanup
+      activeSession = null;
+      currentJob = null;
+      startTime = null;
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+      }
+      
+      // STEP 2: Check for any existing Firebase timer and stop it
+      const existingTimer = await dbService.getActiveTimer();
+      if (existingTimer) {
+        console.log('Found existing timer, stopping first:', existingTimer.id);
+        try {
+          await dbService.stopTimer(existingTimer.id, existingTimer.sessionId);
+        } catch (e) {
+          console.warn('Could not stop existing timer:', e);
+        }
+        // Small delay to ensure Firebase processes
+        await new Promise(r => setTimeout(r, 500));
+      }
+      
+      // STEP 3: Get fresh job data
+      const job = await fetchJob(jobId);
+      if (!job) {
+        showToast('Job not found. Try clicking "Sync Jobs" first.', 'error');
+        console.groupEnd();
+        return;
+      }
+      
+      console.log('Starting timer with job:', job.name);
+      
+      // STEP 4: Start new timer in Firebase
+      const result = await dbService.startTimer(jobId, TimerState.note);
+      
+      if (!result.success) {
+        showToast(result.error || 'Failed to start timer', 'error');
+        console.groupEnd();
+        return;
+      }
+      
+      console.log('Timer started, response:', result);
+      
+      // STEP 5: Validate the response
+      if (!result.timer || !result.timer.serverStartTime) {
+        console.error('Invalid timer response:', result);
+        showToast('Timer started but received invalid data', 'error');
+        console.groupEnd();
+        return;
+      }
+      
+      // STEP 6: Set up TimerState with validated data
+      const sessionData = {
+        id: result.timer.id,
+        jobId: jobId,
+        sessionId: result.session.id,
+        startTime: result.timer.serverStartTime,
+        note: TimerState.note
+      };
+      
+      console.log('Setting up session with:', sessionData);
+      
+      if (!TimerState.setSession(sessionData)) {
+        showToast('Failed to initialize timer', 'error');
+        console.groupEnd();
+        return;
+      }
+      
+      TimerState.job = job;
+      TimerState.persist();
+      
+      console.log('TimerState after setup:', {
+        session: TimerState.session,
+        startTimestamp: TimerState.startTimestamp,
+        elapsed: TimerState.elapsedSeconds
+      });
+      
+      // Sync legacy variables
+      syncLegacyState();
+      
+      // STEP 7: Show timer UI
+      showTimerUI();
+      startTimerAnimation();
+      
+      showToast('Timer started!', 'success');
+      console.groupEnd();
+      
+    } catch (error) {
+      console.error('Error starting timer:', error);
+      showToast('Failed to start timer: ' + error.message, 'error');
+      console.groupEnd();
+    }
+  }
+  
+  // ============================================
+  // STOP TIMER - Reliable stop with fallback
+  // ============================================
+  
+  // Prevent double-stops
+  let isStopping = false;
+  
+  async function stopTimer() {
+    // Guard against double-stop
+    if (isStopping) {
+      console.log('[Timer] Already stopping, ignoring duplicate call');
+      return;
+    }
+    isStopping = true;
+    
+    console.group('[Timer] Stopping timer');
+    
+    // Use TimerState if available, fall back to legacy
+    const session = TimerState.session || activeSession;
+    if (!session) {
+      console.warn('[Timer] No active session to stop');
+      isStopping = false;
+      console.groupEnd();
+      window.location.href = '/pages/dashboard.html';
+      return;
+    }
+    
+    console.log('Session:', session);
+    console.log('TimerState.startTimestamp:', TimerState.startTimestamp);
+    console.log('Legacy startTime:', startTime);
+    
+    try {
+      // STEP 1: Calculate elapsed BEFORE clearing state
+      const now = Date.now();
+      let elapsed = 0;
+      
+      if (TimerState.startTimestamp) {
+        elapsed = Math.floor((now - TimerState.startTimestamp) / 1000);
+        console.log('Calculated from TimerState:', { now, start: TimerState.startTimestamp, elapsed });
+      } else if (startTime) {
+        elapsed = Math.floor((now - startTime.getTime()) / 1000);
+        console.log('Calculated from legacy startTime:', { now, start: startTime.getTime(), elapsed });
+      } else {
+        console.warn('No start time available!');
+      }
+      
+      console.log('Final elapsed seconds:', elapsed);
+      
+      // STEP 2: Cancel animation
+      if (TimerState.animationFrame) {
+        cancelAnimationFrame(TimerState.animationFrame);
+      }
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+      
+      // STEP 3: Try to stop in Firebase
+      let result;
+      try {
+        console.log('Calling dbService.stopTimer...');
+        result = await dbService.stopTimer(session.id, session.sessionId);
+        console.log('Firebase stop result:', result);
+      } catch (stopError) {
+        console.warn('Firebase stop failed:', stopError);
+        result = { success: false, error: stopError.message };
+      }
+      
+      // STEP 4: Clear all state
+      TimerState.clear();
+      localStorage.removeItem('activeTimer');
+      activeSession = null;
+      currentJob = null;
+      startTime = null;
+      note = '';
+      
+      // STEP 5: Show appropriate message
+      const finalDuration = result.success ? (result.duration || elapsed) : elapsed;
+      console.log('Final duration:', finalDuration);
+      
+      if (result.success) {
+        showToast(`Timer stopped! ${formatDuration(finalDuration)} logged.`, 'success');
+      } else {
+        showToast(`Timer stopped (${formatDuration(finalDuration)}). Session may need verification.`, 'warning');
+      }
+      
+      console.groupEnd();
+      
+      // STEP 6: Go to dashboard after brief delay
+      setTimeout(() => {
+        // Set flag to force dashboard refresh
+        localStorage.setItem('everwork_dashboard_refresh', Date.now().toString());
+        window.location.href = '/pages/dashboard.html';
+      }, 2000);
+      
+    } catch (error) {
+      console.error('[Timer] Error stopping timer:', error);
+      console.groupEnd();
+      showToast('Timer stopped. Please verify session in dashboard.', 'warning');
+      localStorage.removeItem('activeTimer');
+      setTimeout(() => {
+        window.location.href = '/pages/dashboard.html';
+      }, 2000);
+    }
+  }
+  
+  // Slide to stop functionality
+  let isDragging = false;
+  let startX = 0;
+  let currentX = 0;
+  
+  const slideTrack = document.getElementById('slideTrack');
+  const slideThumb = document.getElementById('slideThumb');
+  const slideFill = document.getElementById('slideFill');
+  
+  function handleDragStart(e) {
+    isDragging = true;
+    startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+    slideThumb.style.transition = 'none';
+    slideFill.style.transition = 'none';
+  }
+  
+  function handleDragMove(e) {
+    if (!isDragging) return;
+    
+    e.preventDefault();
+    const x = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+    const delta = x - startX;
+    const maxDelta = slideTrack.offsetWidth - slideThumb.offsetWidth - 8;
+    
+    currentX = Math.max(0, Math.min(delta, maxDelta));
+    const progress = (currentX / maxDelta) * 100;
+    
+    slideThumb.style.transform = `translateX(${currentX}px)`;
+    slideFill.style.width = `${progress}%`;
+    
+    // Vibrate on progress
+    if (navigator.vibrate && progress > 50 && progress < 55) {
+      navigator.vibrate(10);
+    }
+  }
+  
+  function handleDragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    
+    const maxDelta = slideTrack.offsetWidth - slideThumb.offsetWidth - 8;
+    const progress = currentX / maxDelta;
+    
+    if (progress >= 0.85) {
+      // Success - stop timer
+      slideThumb.style.transform = `translateX(${maxDelta}px)`;
+      slideFill.style.width = '100%';
+      
+      if (navigator.vibrate) navigator.vibrate(50);
+      
+      setTimeout(stopTimer, 300);
+    } else {
+      // Reset
+      slideThumb.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+      slideFill.style.transition = 'width 0.4s ease';
+      slideThumb.style.transform = 'translateX(0)';
+      slideFill.style.width = '0%';
+      currentX = 0;
+    }
+  }
+  
+  // Add event listeners
+  slideThumb.addEventListener('mousedown', handleDragStart);
+  slideThumb.addEventListener('touchstart', handleDragStart, { passive: true });
+  
+  document.addEventListener('mousemove', handleDragMove);
+  document.addEventListener('touchmove', handleDragMove, { passive: false });
+  
+  document.addEventListener('mouseup', handleDragEnd);
+  document.addEventListener('touchend', handleDragEnd);
+  
+  // ============================================
+  // NOTE MANAGEMENT - Updates TimerState
+  // ============================================
+  
+  function showNoteModal() {
+    document.getElementById('noteModal').classList.add('open');
+    document.getElementById('noteInput').value = TimerState.note || note;
+    document.getElementById('noteInput').focus();
+  }
+  
+  function closeNoteModal() {
+    document.getElementById('noteModal').classList.remove('open');
+  }
+  
+  function saveNote() {
+    const noteText = document.getElementById('noteInput').value.trim();
+    
+    // Update both TimerState and legacy variable
+    TimerState.note = noteText;
+    note = noteText;
+    
+    // Update UI
+    const noteDisplay = document.getElementById('noteDisplay');
+    if (noteText) {
+      noteDisplay.classList.remove('hidden');
+      document.getElementById('noteText').textContent = noteText;
+    } else {
+      noteDisplay.classList.add('hidden');
+    }
+    
+    // Persist to localStorage
+    TimerState.persist();
+    
+    closeNoteModal();
+    showToast('Note saved', 'success');
+  }
+  
+  // Navigation
+  function navigateBack() {
+    window.location.href = '/pages/dashboard.html';
+  }
+  
+  // ============================================
+  // EMERGENCY RESET
+  // ============================================
+  
+  function clearStuckTimer() {
+    if (confirm('Clear the stuck timer? This will remove any active timer data.')) {
+      TimerState.clear();
+      localStorage.removeItem('activeTimer');
+      localStorage.removeItem('everwork_jobs');
+      activeSession = null;
+      currentJob = null;
+      startTime = null;
+      animationFrame = null;
+      location.reload();
+    }
+  }
+  
+  // ============================================
+  // DEBUG - Comprehensive state inspection
+  // ============================================
+  
+  async function debugJobData() {
+    console.group('=== TIMER DEBUG ===');
+    
+    // TimerState info
+    console.log('TimerState:', {
+      isRunning: TimerState.isRunning,
+      session: TimerState.session,
+      job: TimerState.job?.name,
+      startTimestamp: TimerState.startTimestamp,
+      elapsedSeconds: TimerState.elapsedSeconds,
+      note: TimerState.note
+    });
+    
+    // Legacy variables
+    console.log('Legacy state:', {
+      activeSession,
+      currentJob: currentJob?.name,
+      startTime,
+      note
+    });
+    
+    // localStorage
+    console.log('localStorage timer:', localStorage.getItem('activeTimer'));
+    
+    // Firebase
+    await dbService.waitForAuth(5000);
+    const firebaseTimer = await dbService.getActiveTimer();
+    console.log('Firebase timer:', firebaseTimer);
+    
+    // Jobs
+    const jobs = await dbService.getJobs(true);
+    console.log('Jobs loaded:', jobs.length);
+    
+    console.groupEnd();
+    showToast('Debug info in console (F12)', 'info');
+  }
+  
+  // Force sync jobs
+  async function forceSyncJobs() {
+    try {
+      showToast('Syncing jobs...', 'info');
+      await dbService.waitForAuth(5000);
+      
+      // Clear job cache
+      const allJobs = await dbService.getJobs(true);
+      localStorage.setItem('everwork_jobs', JSON.stringify(allJobs));
+      
+      console.log('[Timer] Synced', allJobs.length, 'jobs');
+      showToast(`Synced ${allJobs.length} jobs`, 'success');
+      
+      // Reload job selector if visible
+      if (!document.getElementById('startView').classList.contains('hidden')) {
+        showJobSelector();
+      }
+    } catch (error) {
+      console.error('[Timer] Sync error:', error);
+      showToast('Sync failed', 'error');
+    }
+  }
+  
+  // Utility functions
+  function formatTime(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  function formatDuration(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins}m`;
+  }
+  
+  function showToast(message, type = 'info') {
+    // Use the global showToast from scripts.js if available
+    if (typeof window !== 'undefined' && window.showToast && window.showToast !== showToast) {
+      window.showToast(message, type);
+    } else {
+      // Simple fallback
+      console.log(`[Toast:${type}] ${message}`);
+      // Create a simple toast
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#3b82f6'};
+        color: white;
+        border-radius: 8px;
+        font-weight: 500;
+        z-index: 9999;
+        animation: fadeIn 0.3s ease;
+      `;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+  }
+  
+  function showError(message) {
+    document.body.innerHTML = `
+      <div class="flex flex-col items-center justify-center h-screen px-5 text-center">
+        <div class="w-16 h-16 mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+          <i data-lucide="alert-circle" class="w-8 h-8 text-red-400"></i>
+        </div>
+        <h2 class="text-xl font-semibold mb-2">Error</h2>
+        <p class="text-white/50 mb-6">${message}</p>
+        <button onclick="location.reload()" class="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+          Retry
+        </button>
+      </div>
+    `;
+    lucide.createIcons();
+  }
+  
+  // Expose functions
+  window.navigateBack = navigateBack;
+  window.showNoteModal = showNoteModal;
+  window.closeNoteModal = closeNoteModal;
+  window.saveNote = saveNote;
+  window.showJobSelector = showJobSelector;
+  window.startTimerForJob = startTimerForJob;
+  window.clearStuckTimer = clearStuckTimer;
+  window.debugJobData = debugJobData;
+  window.forceSyncJobs = forceSyncJobs;
+  
+  // Initialize when DOM is ready
+  document.addEventListener('DOMContentLoaded', init);
+  
+  </script>
+
+</body>
+</html>

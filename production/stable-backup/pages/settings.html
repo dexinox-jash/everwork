@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0F0F13">
+  <title>Settings | Ever Work</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Unregister old service worker if causing issues -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('[SW] Unregistered old service worker');
+        }
+        if ('caches' in window) {
+          caches.keys().then(function(cacheNames) {
+            cacheNames.forEach(function(cacheName) {
+              caches.delete(cacheName);
+            });
+          });
+        }
+      });
+    }
+  </script>
+  
+  <style>
+    :root {
+      --primary-start: #FF9A56;
+      --primary-end: #FF6B6B;
+      --bg-primary: #0F0F13;
+      --bg-secondary: #1A1A1F;
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.7);
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+    
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding-bottom: 100px;
+    }
+    
+    /* Settings Item */
+    .settings-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    
+    .settings-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+    
+    .settings-item-content {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    
+    .settings-item-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+    
+    .settings-item-text h4 {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    
+    .settings-item-text p {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    
+    .settings-item-value {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+    
+    /* Section Header */
+    .section-header {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-secondary);
+      margin: 32px 0 16px 4px;
+    }
+    
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 299;
+    }
+    
+    .modal-overlay.open { opacity: 1; }
+    
+    .modal-content {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 480px;
+      margin: 0 auto;
+      background: var(--bg-secondary);
+      border-radius: 24px 24px 0 0;
+      padding: 24px;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+      z-index: 300;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    
+    .modal-content.open { transform: translateY(0); }
+    
+    /* Input */
+    .input-field {
+      width: 100%;
+      padding: 16px 20px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 16px;
+      transition: all 0.2s ease;
+      margin-bottom: 16px;
+    }
+    
+    .input-field:focus {
+      outline: none;
+      border-color: rgba(255, 154, 86, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+    }
+    
+    /* Button */
+    .btn-primary {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%);
+      border: none;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .btn-danger {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 14px;
+      background: rgba(248, 113, 113, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: #F87171;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-danger:hover { background: rgba(248, 113, 113, 0.25); }
+    
+    /* Toggle Switch */
+    .toggle-switch {
+      width: 52px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    
+    .toggle-switch.active { background: linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%); }
+    
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 24px;
+      height: 24px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s ease;
+    }
+    
+    .toggle-switch.active::after { transform: translateX(24px); }
+    
+    /* User Card */
+    .user-card {
+      background: linear-gradient(135deg, rgba(255, 154, 86, 0.15) 0%, rgba(255, 107, 107, 0.15) 100%);
+      border: 1px solid rgba(255, 154, 86, 0.2);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FF9A56 0%, #FF6B6B 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 16px;
+    }
+    
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 20px 0;
+    }
+    
+    .stat-box {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 16px 8px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--primary-start);
+      margin-bottom: 4px;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    /* Ensure hidden class works */
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Mobile optimizations */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    @media (max-width: 640px) {
+      html { font-size: 14px; }
+    }
+    
+    body {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="px-5 py-6 flex items-center gap-3 sticky top-0 bg-[#0F0F13]/95 backdrop-blur-xl z-10">
+    <a href="/pages/dashboard.html" class="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors">
+      <i data-lucide="arrow-left" class="w-5 h-5 text-white/70"></i>
+    </a>
+    <h1 class="text-xl font-semibold">Settings</h1>
+  </header>
+
+  <main class="px-5">
+    
+    <!-- User Profile Card -->
+    <div id="userCard" class="user-card hidden">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="avatar" id="userAvatar">U</div>
+          <h2 class="text-xl font-bold" id="userName">User</h2>
+          <p class="text-white/60 text-sm" id="userEmail">user@example.com</p>
+        </div>
+        <span class="px-3 py-1 rounded-full bg-[#4ADE80]/20 text-[#4ADE80] text-xs font-medium">Pro</span>
+      </div>
+      
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value" id="statTotalHours">0</div>
+          <div class="stat-label">Hours</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statSessions">0</div>
+          <div class="stat-label">Sessions</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statJobs">0</div>
+          <div class="stat-label">Jobs</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Guest Mode Card -->
+    <div id="guestCard" class="user-card hidden" style="background: rgba(255,255,255,0.05);">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+          <i data-lucide="user" class="w-8 h-8 text-white/50"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold">Guest Mode</h2>
+          <p class="text-white/60 text-sm">Sign in to sync across devices</p>
+        </div>
+      </div>
+      <button onclick="navigateToAuth()" class="btn-primary mt-4">Sign In / Create Account</button>
+    </div>
+
+    <!-- Goals Section -->
+    <div class="section-header">Goals</div>
+    
+    <div class="settings-item" onclick="showGoalModal()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="target" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Daily Goal</h4>
+          <p>Hours you want to work each day</p>
+        </div>
+      </div>
+      <div class="settings-item-value">
+        <span id="dailyGoalValue">8h</span>
+        <i data-lucide="chevron-right" class="w-5 h-5"></i>
+      </div>
+    </div>
+
+    <!-- Preferences Section -->
+    <div class="section-header">Preferences</div>
+    
+    <div class="settings-item" onclick="showCurrencyModal()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="dollar-sign" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Currency</h4>
+          <p>Display format for earnings</p>
+        </div>
+      </div>
+      <div class="settings-item-value">
+        <span id="currencyValue">USD ($)</span>
+        <i data-lucide="chevron-right" class="w-5 h-5"></i>
+      </div>
+    </div>
+    
+    <div class="settings-item">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Notifications</h4>
+          <p>Get reminders about active timers</p>
+        </div>
+      </div>
+      <div class="toggle-switch" id="notificationToggle" onclick="toggleNotifications()"></div>
+    </div>
+    
+    <div class="settings-item">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="moon" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Dark Mode</h4>
+          <p>Always use dark theme</p>
+        </div>
+      </div>
+      <div class="toggle-switch active" id="darkModeToggle"></div>
+    </div>
+
+    <!-- Data Section -->
+    <div class="section-header">Data</div>
+    
+    <div class="settings-item" onclick="exportData()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="download" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Export Data</h4>
+          <p>Download your data as JSON</p>
+        </div>
+      </div>
+      <i data-lucide="chevron-right" class="w-5 h-5 text-white/30"></i>
+    </div>
+    
+    <div class="settings-item" onclick="showImportModal()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="upload" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Import Data</h4>
+          <p>Restore from backup file</p>
+        </div>
+      </div>
+      <i data-lucide="chevron-right" class="w-5 h-5 text-white/30"></i>
+    </div>
+    
+    <div class="settings-item" onclick="showClearDataModal()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon" style="background: rgba(248, 113, 113, 0.15);">
+          <i data-lucide="trash-2" class="w-5 h-5 text-[#F87171]"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Clear All Data</h4>
+          <p>Delete all your data permanently</p>
+        </div>
+      </div>
+      <i data-lucide="chevron-right" class="w-5 h-5 text-white/30"></i>
+    </div>
+
+    <!-- Account Section -->
+    <div class="section-header" id="accountSectionHeader">Account</div>
+    
+    <div class="settings-item" onclick="showChangePasswordModal()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="lock" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Change Password</h4>
+          <p>Update your account password</p>
+        </div>
+      </div>
+      <i data-lucide="chevron-right" class="w-5 h-5 text-white/30"></i>
+    </div>
+    
+    <div class="settings-item" onclick="showLogoutModal()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Sign Out</h4>
+          <p>Log out of your account</p>
+        </div>
+      </div>
+      <i data-lucide="chevron-right" class="w-5 h-5 text-white/30"></i>
+    </div>
+
+    <!-- About Section -->
+    <div class="section-header">About</div>
+    
+    <div class="settings-item" onclick="showEasterEgg()">
+      <div class="settings-item-content">
+        <div class="settings-item-icon">
+          <i data-lucide="info" class="w-5 h-5"></i>
+        </div>
+        <div class="settings-item-text">
+          <h4>Version</h4>
+          <p>Ever Work v1.0.0</p>
+        </div>
+      </div>
+      <i data-lucide="heart" class="w-5 h-5 text-[#FF6B6B]"></i>
+    </div>
+
+    <div class="h-8"></div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-[#1A1A1F]/95 backdrop-blur-xl border-t border-white/10 px-6 py-3 pb-safe z-20">
+    <div class="flex justify-around items-center max-w-md mx-auto">
+      <a href="/pages/dashboard.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Home</span>
+      </a>
+      <a href="/pages/timer.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="clock" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Timer</span>
+      </a>
+      <a href="/pages/jobs.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="briefcase" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Jobs</span>
+      </a>
+      <a href="/pages/calendar.html" class="nav-item flex flex-col items-center gap-1 text-white/50">
+        <i data-lucide="calendar" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Stats</span>
+      </a>
+      <a href="/pages/settings.html" class="nav-item flex flex-col items-center gap-1 text-[#FF9A56]">
+        <i data-lucide="settings" class="w-6 h-6"></i>
+        <span class="text-[11px] font-medium">Settings</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Daily Goal Modal -->
+  <div id="goalModal" class="modal-overlay hidden" onclick="closeModal('goalModal')"></div>
+  <div id="goalModalContent" class="modal-content hidden">
+    <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+    <h3 class="text-xl font-semibold mb-6">Daily Goal</h3>
+    <label class="block text-white/70 text-sm font-medium mb-2">Hours per day</label>
+    <input type="number" id="goalInput" min="1" max="24" step="0.5" class="input-field">
+    <button onclick="saveGoal()" class="btn-primary">Save Goal</button>
+  </div>
+
+  <!-- Currency Modal -->
+  <div id="currencyModal" class="modal-overlay hidden" onclick="closeModal('currencyModal')"></div>
+  <div id="currencyModalContent" class="modal-content hidden">
+    <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+    <h3 class="text-xl font-semibold mb-6">Currency</h3>
+    <div class="space-y-2" id="currencyList">
+      <!-- Options injected -->
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div id="importModal" class="modal-overlay hidden" onclick="closeModal('importModal')"></div>
+  <div id="importModalContent" class="modal-content hidden">
+    <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+    <h3 class="text-xl font-semibold mb-4">Import Data</h3>
+    <p class="text-white/60 text-sm mb-4">This will replace all your current data. Make sure to export first if you want to keep a backup.</p>
+    <input type="file" id="importFile" accept=".json" class="hidden" onchange="handleImportFile(this)">
+    <button onclick="document.getElementById('importFile').click()" class="btn-primary mb-3">Choose Backup File</button>
+    <button onclick="closeModal('importModal')" class="btn-secondary w-full py-4 rounded-xl bg-white/5 text-white/70 font-medium">Cancel</button>
+  </div>
+
+  <!-- Logout Modal -->
+  <div id="logoutModal" class="modal-overlay hidden" onclick="closeModal('logoutModal')"></div>
+  <div id="logoutModalContent" class="modal-content hidden">
+    <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F87171]/20 flex items-center justify-center">
+      <i data-lucide="log-out" class="w-8 h-8 text-[#F87171]"></i>
+    </div>
+    <h3 class="text-xl font-semibold text-center mb-2">Sign Out?</h3>
+    <p class="text-white/60 text-center mb-6 text-sm">Your data is safely stored in the cloud.</p>
+    <div class="flex gap-3">
+      <button onclick="closeModal('logoutModal')" class="flex-1 py-4 rounded-xl bg-white/10 text-white/70 font-medium">Cancel</button>
+      <button onclick="logout()" class="flex-1 py-4 rounded-xl bg-[#F87171] text-white font-medium">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- Clear Data Modal -->
+  <div id="clearDataModal" class="modal-overlay hidden" onclick="closeModal('clearDataModal')"></div>
+  <div id="clearDataModalContent" class="modal-content hidden">
+    <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6"></div>
+    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[#F87171]/20 flex items-center justify-center">
+      <i data-lucide="alert-triangle" class="w-8 h-8 text-[#F87171]"></i>
+    </div>
+    <h3 class="text-xl font-semibold text-center mb-2">Clear All Data?</h3>
+    <p class="text-white/60 text-center mb-6 text-sm">This action cannot be undone. All your jobs, sessions, and settings will be permanently deleted.</p>
+    <input type="text" id="confirmClear" placeholder="Type DELETE to confirm" class="input-field">
+    <button onclick="clearAllData()" class="btn-danger">Delete Everything</button>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed top-6 left-1/2 -translate-x-1/2 z-[500] pointer-events-none"></div>
+
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="../shared/animations.css">
+  
+  <!-- Scripts -->
+  <script src="../shared/config.js"></script>
+  <script src="../shared/time-service.js"></script>
+  <script src="../shared/firebase-service.js"></script>
+  <script src="../shared/scripts.js"></script>
+  <script src="../shared/enhanced-interactions.js"></script>
+  
+  <script>
+    // Initialize
+    try {
+    
+    let currentUser = null;
+    let profile = null;
+    
+    const currencies = [
+      { code: 'USD', symbol: '$', name: 'US Dollar' },
+      { code: 'EUR', symbol: '€', name: 'Euro' },
+      { code: 'GBP', symbol: '£', name: 'British Pound' },
+      { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+      { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+      { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+      { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+      { code: 'Other', symbol: '$', name: 'Other' }
+    ];
+    
+    async function init() {
+      lucide.createIcons();
+      
+      // Wait for Firebase auth to be ready using dbService
+      await dbService.waitForAuth(15000);
+      
+      currentUser = dbService.getCurrentUser();
+      console.log('[Settings] Auth resolved:', currentUser?.email || 'no user', 'Guest mode:', localStorage.getItem('everwork_guest_mode'));
+      console.log('[Settings] Current user:', currentUser?.email || 'none');
+      
+      if (currentUser) {
+        // Show user card
+        document.getElementById('userCard').classList.remove('hidden');
+        document.getElementById('guestCard').classList.add('hidden');
+        document.getElementById('accountSectionHeader').classList.remove('hidden');
+        
+        // Load profile
+        profile = await dbService.getProfile();
+        if (profile) {
+          document.getElementById('userName').textContent = profile.displayName || currentUser.displayName || profile.email?.split('@')[0] || 'User';
+          document.getElementById('userEmail').textContent = profile.email || currentUser.email || '';
+          const avatarChar = (profile.displayName || currentUser.displayName || profile.email || currentUser.email || 'U')[0].toUpperCase();
+          document.getElementById('userAvatar').textContent = avatarChar;
+          document.getElementById('dailyGoalValue').textContent = (profile.dailyGoalHours || profile.daily_goal_hours || 8) + 'h';
+        } else {
+          // No profile yet, use auth info
+          document.getElementById('userName').textContent = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+          document.getElementById('userEmail').textContent = currentUser.email || '';
+          document.getElementById('userAvatar').textContent = (currentUser.displayName || currentUser.email || 'U')[0].toUpperCase();
+        }
+        
+        // Load stats
+        await loadStats();
+      } else {
+        // Guest mode
+        document.getElementById('userCard').classList.add('hidden');
+        document.getElementById('guestCard').classList.remove('hidden');
+        document.getElementById('accountSectionHeader').classList.add('hidden');
+      }
+      
+      // Setup currency list
+      setupCurrencyList();
+      lucide.createIcons();
+    }
+    
+    async function loadStats() {
+      try {
+        const jobs = await dbService.getJobs(true);
+        const sessions = await dbService.getSessions();
+        
+        // Use normalized duration field (duration_seconds or duration)
+        const totalHours = sessions.reduce((sum, s) => sum + (s.duration_seconds || s.duration || 0), 0) / 3600;
+        
+        document.getElementById('statTotalHours').textContent = Math.round(totalHours);
+        document.getElementById('statSessions').textContent = sessions.length;
+        document.getElementById('statJobs').textContent = jobs.length;
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+    
+    function setupCurrencyList() {
+      const list = document.getElementById('currencyList');
+      list.innerHTML = currencies.map(c => `
+        <button onclick="selectCurrency('${c.code}', '${c.symbol}')" class="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+          <div class="flex items-center gap-3">
+            <span class="text-xl">${c.symbol}</span>
+            <span>${c.name}</span>
+          </div>
+          ${profile?.currency === c.symbol ? '<i data-lucide="check" class="w-5 h-5 text-[#4ADE80]"></i>' : ''}
+        </button>
+      `).join('');
+    }
+    
+    // Modal functions
+    function showModal(overlayId, contentId) {
+      document.getElementById(overlayId).classList.remove('hidden');
+      document.getElementById(contentId).classList.remove('hidden');
+      requestAnimationFrame(() => {
+        document.getElementById(overlayId).classList.add('open');
+        document.getElementById(contentId).classList.add('open');
+      });
+    }
+    
+    function closeModal(overlayId) {
+      const contentId = overlayId + 'Content';
+      document.getElementById(overlayId).classList.remove('open');
+      document.getElementById(contentId).classList.remove('open');
+      setTimeout(() => {
+        document.getElementById(overlayId).classList.add('hidden');
+        document.getElementById(contentId).classList.add('hidden');
+      }, 300);
+    }
+    
+    // Goal
+    function showGoalModal() {
+      document.getElementById('goalInput').value = profile?.daily_goal_hours || 8;
+      showModal('goalModal', 'goalModalContent');
+    }
+    
+    async function saveGoal() {
+      const value = parseFloat(document.getElementById('goalInput').value);
+      if (value < 1 || value > 24) {
+        showToast('Please enter a value between 1 and 24', 'error');
+        return;
+      }
+      
+      // Use camelCase field name for Firebase
+      const result = await dbService.updateProfile({ dailyGoalHours: value });
+      if (result.success) {
+        document.getElementById('dailyGoalValue').textContent = value + 'h';
+        closeModal('goalModal');
+        showToast('Goal updated', 'success');
+        // Update local profile cache
+        if (profile) {
+          profile.dailyGoalHours = value;
+        }
+        // Notify other tabs
+        localStorage.setItem('everwork_settings_updated', Date.now().toString());
+      } else {
+        showToast('Failed to update goal: ' + (result.error || 'Unknown error'), 'error');
+      }
+    }
+    
+    // Currency
+    function showCurrencyModal() {
+      showModal('currencyModal', 'currencyModalContent');
+    }
+    
+    async function selectCurrency(code, symbol) {
+      const result = await dbService.updateProfile({ currency: symbol });
+      if (result.success) {
+        document.getElementById('currencyValue').textContent = code + ' (' + symbol + ')';
+        closeModal('currencyModal');
+        showToast('Currency updated', 'success');
+      }
+    }
+    
+    // Notifications toggle
+    function toggleNotifications() {
+      const toggle = document.getElementById('notificationToggle');
+      toggle.classList.toggle('active');
+      // Save preference
+      localStorage.setItem('everwork_notifications', toggle.classList.contains('active'));
+    }
+    
+    // Data export/import
+    async function exportData() {
+      try {
+        const data = {
+          exportDate: new Date().toISOString(),
+          user: currentUser?.email || 'guest',
+          jobs: await dbService.getJobs(true),
+          sessions: await dbService.getSessions(),
+          profile: profile
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `everwork-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showToast('Data exported', 'success');
+      } catch (error) {
+        showToast('Export failed', 'error');
+      }
+    }
+    
+    function showImportModal() {
+      showModal('importModal', 'importModalContent');
+    }
+    
+    async function handleImportFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        if (!data.jobs || !data.sessions) {
+          throw new Error('Invalid backup file');
+        }
+        
+        // Confirm
+        if (!confirm(`Import ${data.jobs.length} jobs and ${data.sessions.length} sessions? This will replace your current data.`)) {
+          return;
+        }
+        
+        // Import jobs
+        for (const job of data.jobs) {
+          await dbService.createJob({
+            name: job.name,
+            color: job.color,
+            hourlyRate: job.hourly_rate,
+            icon: job.icon
+          });
+        }
+        
+        // Import sessions
+        for (const session of data.sessions) {
+          await dbService.createSession({
+            jobId: session.job_id,
+            startTime: session.start_time,
+            endTime: session.end_time,
+            duration: session.duration_seconds,
+            date: session.date,
+            note: session.note,
+            earnings: session.earnings
+          });
+        }
+        
+        closeModal('importModal');
+        showToast('Data imported successfully', 'success');
+        
+      } catch (error) {
+        showToast('Import failed: ' + error.message, 'error');
+      }
+    }
+    
+    // Clear data
+    function showClearDataModal() {
+      showModal('clearDataModal', 'clearDataModalContent');
+    }
+    
+    async function clearAllData() {
+      const confirm = document.getElementById('confirmClear').value;
+      if (confirm !== 'DELETE') {
+        showToast('Type DELETE to confirm', 'warning');
+        return;
+      }
+      
+      try {
+        if (currentUser) {
+          // Clear from Firebase and local
+          await dbService.clearAllUserData();
+        } else {
+          // Just clear local data if not logged in
+          await dbService.clearLocalData();
+        }
+        
+        closeModal('clearDataModal');
+        showToast('All data cleared', 'success');
+        setTimeout(() => location.reload(), 1500);
+      } catch (error) {
+        console.error('[Settings] Clear data error:', error);
+        showToast('Failed to clear data: ' + error.message, 'error');
+      }
+    }
+    
+    // Logout
+    function showLogoutModal() {
+      showModal('logoutModal', 'logoutModalContent');
+    }
+    
+    async function logout() {
+      try {
+        // Clear all localStorage items
+        localStorage.removeItem('activeTimer');
+        localStorage.removeItem('everwork_guest_mode');
+        localStorage.removeItem('everwork_offline_mode');
+        localStorage.removeItem('everwork_guest_id');
+        localStorage.removeItem('everwork_notifications');
+        
+        // Clear IndexedDB
+        await dbService.clearLocalData();
+        
+        // Sign out from Firebase
+        const result = await dbService.signOut();
+        
+        if (result.success) {
+          showToast('Signed out successfully', 'success');
+          setTimeout(() => {
+            window.location.href = '/pages/auth.html';
+          }, 500);
+        } else {
+          showToast('Sign out failed', 'error');
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+        // Still redirect even if cleanup fails
+        window.location.href = '/pages/auth.html';
+      }
+    }
+    
+    // Navigation
+    function navigateToAuth() {
+      window.location.href = '/pages/auth.html';
+    }
+    
+    // Easter egg
+    let easterEggClicks = 0;
+    function showEasterEgg() {
+      easterEggClicks++;
+      if (easterEggClicks >= 5) {
+        showToast('Made with 💛 for all the hustlers out there!', 'success');
+        easterEggClicks = 0;
+      }
+    }
+    
+    // Toast
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const colors = {
+        info: 'bg-white/90 text-black',
+        success: 'bg-[#4ADE80]/90 text-black',
+        warning: 'bg-[#FBBF24]/90 text-black',
+        error: 'bg-[#F87171]/90 text-white'
+      };
+      
+      toast.className = `px-6 py-3 rounded-full text-sm font-medium shadow-lg ${colors[type]}`;
+      toast.textContent = message;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-20px)';
+        toast.style.transition = 'all 300ms';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', init);
+    
+    // Expose functions to window scope for HTML onclick handlers
+    window.showGoalModal = showGoalModal;
+    window.saveGoal = saveGoal;
+    window.showCurrencyModal = showCurrencyModal;
+    window.selectCurrency = selectCurrency;
+    window.toggleNotifications = toggleNotifications;
+    window.exportData = exportData;
+    window.showImportModal = showImportModal;
+    window.handleImportFile = handleImportFile;
+    window.showClearDataModal = showClearDataModal;
+    window.clearAllData = clearAllData;
+    window.showLogoutModal = showLogoutModal;
+    window.logout = logout;
+    window.navigateToAuth = navigateToAuth;
+    window.closeModal = closeModal;
+    window.showEasterEgg = showEasterEgg;
+    
+    } catch (err) {
+      console.error('[Settings] Script initialization error:', err);
+      alert('Error initializing settings page: ' + err.message);
+    }
+  </script>
+</body>
+</html>

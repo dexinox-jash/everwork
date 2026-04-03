@@ -1,0 +1,31 @@
+mutation SeedDemoData @transaction @auth(level: USER, insecureReason: "This is a seed data mutation for development purposes and does not expose sensitive user data.") {
+  user_insertMany(data: [
+    {
+      id: "6e268a2d-209a-4c28-98e3-982855f75e92",
+      displayName: "Demo User",
+      email: "demo.user@example.com",
+      createdAt: "2023-10-27T10:00:00Z"
+    }
+  ])
+  project_insertMany(data: [
+    {
+      id: "7d1b32f1-6a84-4e2b-b8c5-9c1a5d0a4e7f",
+      userId: "6e268a2d-209a-4c28-98e3-982855f75e92",
+      name: "Firebase Data Connect Demo Project",
+      description: "A sample project for showcasing Firebase Data Connect capabilities.",
+      createdAt: "2023-10-27T10:30:00Z"
+    }
+  ])
+  workEntry_insertMany(data: [
+    {
+      id: "8c7a6e1d-4b3f-4e2a-8d1c-7f5b9e0c1a2d",
+      userId: "6e268a2d-209a-4c28-98e3-982855f75e92",
+      projectId: "7d1b32f1-6a84-4e2b-b8c5-9c1a5d0a4e7f",
+      startTime: "2023-10-27T11:00:00Z",
+      endTime: "2023-10-27T12:00:00Z",
+      date: "2023-10-27",
+      notes: "Initial setup and exploration of Firebase Data Connect.",
+      createdAt: "2023-10-27T12:00:00Z"
+    }
+  ])
+}

@@ -1,0 +1,47 @@
+query ListUserProjects($userId: UUID!) @auth(level: USER, insecureReason: "This query lists projects for a specific user, requiring user authentication.") {
+  projects(where: {userId: {eq: $userId}}) {
+    id
+    name
+    description
+    createdAt
+  }
+}
+
+mutation CreateWorkEntry($userId: UUID!, $projectId: UUID, $startTime: Timestamp!, $endTime: Timestamp!, $date: Date!, $notes: String) @auth(level: USER) {
+  workEntry_insert(data: {
+    userId: $userId,
+    projectId: $projectId,
+    startTime: $startTime,
+    endTime: $endTime,
+    date: $date,
+    notes: $notes,
+    createdAt_expr: "request.time"
+  }) {
+    id
+  }
+}
+
+query GetWorkEntryDetails($id: UUID!) @auth(level: USER, insecureReason: "This query retrieves details for a specific work entry, requiring user authentication.") {
+  workEntry(id: $id) {
+    id
+    startTime
+    endTime
+    date
+    notes
+    user {
+      displayName
+    }
+    project {
+      name
+    }
+  }
+}
+
+mutation UpdateUserProfile($userId: UUID!, $displayName: String, $email: String) @auth(level: USER) {
+  user_update(key: {id: $userId}, data: {
+    displayName: $displayName,
+    email: $email
+  }) {
+    id
+  }
+}
