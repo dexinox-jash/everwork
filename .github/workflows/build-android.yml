@@ -26,12 +26,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -41,22 +35,33 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build Android APK (Local)
+      - name: Expo Prebuild
         run: |
-          # Use npx expo prebuild to generate native code
+          echo "Running expo prebuild..."
           npx expo prebuild --platform android --clean
-          
-          # Build debug APK using Gradle
+          echo "Prebuild complete. Listing directory:"
+          ls -la
+          echo "Checking android directory:"
+          ls -la android/ || echo "No android directory found!"
+
+      - name: Build Android APK
+        run: |
+          echo "Building Android APK..."
           cd android
-          ./gradlew assembleRelease --no-daemon
-          
-          # Copy APK to root for artifact upload
-          cp app/build/outputs/apk/release/app-release.apk ../build.apk
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          echo "Build complete. Listing outputs:"
+          find . -name "*.apk" -type f
+          ls -la app/build/outputs/apk/release/ || echo "No APK output directory!"
+
+      - name: Copy APK
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk build.apk || echo "APK not found at expected path"
+          ls -la build.apk || echo "build.apk not created"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: everwork-android
           path: EverworkApp/build.apk

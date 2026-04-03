@@ -26,44 +26,44 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '15.2'
 
-      - name: Install CocoaPods
-        run: sudo gem install cocoapods
-
-      - name: Build iOS (Local)
+      - name: Expo Prebuild
         run: |
-          # Use npx expo prebuild to generate native code
+          echo "Running expo prebuild..."
           npx expo prebuild --platform ios --clean
-          
-          # Install pods
+          echo "Prebuild complete. Listing directory:"
+          ls -la
+          echo "Checking ios directory:"
+          ls -la ios/ || echo "No ios directory found!"
+
+      - name: Install CocoaPods
+        run: |
           cd ios
-          pod install
-          
-          # Build archive (requires signing setup for physical devices)
-          # For simulator build (no signing required):
-          xcodebuild -workspace Everwork.xcworkspace -scheme Everwork -configuration Release -sdk iphonesimulator -derivedDataPath build
-          
-          # Package as IPA (simplified - actual IPA requires proper signing)
-          cd build/Build/Products/Release-iphonesimulator
+          pod install --verbose
+
+      - name: Build iOS App
+        run: |
+          echo "Building iOS for simulator (no code signing required)..."
+          cd ios
+          xcodebuild -workspace Everwork.xcworkspace -scheme Everwork -configuration Release -sdk iphonesimulator -derivedDataPath ../build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+          echo "Build complete. Listing build directory:"
+          ls -la ../build/Build/Products/ || echo "No build products found!"
+
+      - name: Package IPA
+        run: |
           mkdir -p Payload
-          cp -r Everwork.app Payload/
-          zip -r ../../../build.ipa Payload
-          cd ../../..
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          cp -r build/Build/Products/Release-iphonesimulator/Everwork.app Payload/ || echo "App not found at expected path"
+          ls -la Payload/ || echo "Payload directory empty!"
+          zip -r build.ipa Payload || echo "Failed to create IPA"
+          ls -la build.ipa || echo "IPA not created"
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: everwork-ios
           path: EverworkApp/build.ipa
