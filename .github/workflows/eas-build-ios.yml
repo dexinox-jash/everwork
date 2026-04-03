@@ -34,21 +34,36 @@ jobs:
       - name: Install CocoaPods
         run: sudo gem install cocoapods
 
-      - name: Configure EAS Build (Local Build)
+      - name: Prebuild Expo project
         run: |
           cd EverworkApp
-          # Create a local build without needing Expo account
-          eas build --platform ios --profile preview --local --non-interactive --output build.ipa || \
-          (echo "Local build failed, attempting with npx" && \
-           npx eas-cli build --platform ios --profile preview --local --non-interactive --output build.ipa)
-        timeout-minutes: 45
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          npx expo prebuild --platform ios
 
-      - name: Upload IPA
+      - name: Pod Install
+        run: |
+          cd EverworkApp/ios
+          pod install --repo-update
+        env:
+          NO_FLIPPER: 1
+
+      - name: Build iOS
+        run: |
+          cd EverworkApp/ios
+          xcodebuild -workspace EverworkApp.xcworkspace \
+            -scheme EverworkApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            clean build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+        timeout-minutes: 45
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: everwork-ios
-          path: EverworkApp/build.ipa
+          path: EverworkApp/ios/build/
           retention-days: 30

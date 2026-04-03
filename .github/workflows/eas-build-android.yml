@@ -29,21 +29,21 @@ jobs:
       - name: Setup EAS CLI
         run: npm install -g eas-cli
 
-      - name: Configure EAS Build (Local Build)
+      - name: Prebuild Expo project
         run: |
           cd EverworkApp
-          # Create a local build without needing Expo account
-          eas build --platform android --profile preview --local --non-interactive --output build.apk || \
-          (echo "Local build failed, attempting with npx" && \
-           npx eas-cli build --platform android --profile preview --local --non-interactive --output build.apk)
+          npx expo prebuild --platform android
+
+      - name: Build Android (Local Gradle)
+        run: |
+          cd EverworkApp/android
+          ./gradlew assembleRelease --no-daemon
         timeout-minutes: 45
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: everwork-android
-          path: EverworkApp/build.apk
+          path: EverworkApp/android/app/build/outputs/apk/release/*.apk
           retention-days: 30
