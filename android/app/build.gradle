@@ -8,9 +8,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdkVersion rootProject.ext.compileSdkVersion
 
-    namespace "com.everwork.app"
+    namespace "com.uxtra.everwork"
     defaultConfig {
-        applicationId "com.everwork.app"
+        applicationId "com.uxtra.everwork"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
